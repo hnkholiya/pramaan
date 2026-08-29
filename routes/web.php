@@ -18,8 +18,13 @@ use Illuminate\Support\Facades\Route;
 */
 
 Route::get('/', [PublicController::class, 'home'])->name('home');
-Route::get('/verify', [PublicController::class, 'verifyForm'])->name('public.verify');
+Route::get('/verify', [PublicController::class, 'verify'])
+    ->name('public.verify');
 Route::get('/verify/{token}', [PublicController::class, 'verify'])->name('public.verify.show');
+
+
+
+
 
 /*
 |--------------------------------------------------------------------------

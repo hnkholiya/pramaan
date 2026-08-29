@@ -17,24 +17,35 @@ class PublicController extends Controller
         return Inertia::render('Public/Home');
     }
 
-    public function verifyForm()
+    /**
+     * Public certificate verification.
+     *
+     * Supports:
+     * /verify
+     * /verify?number=PRM-...
+     * /verify/{token}
+     */
+    public function verify(Request $request, ?string $token = null)
     {
-        return Inertia::render('Public/Verify', [
-            'result' => null,
-        ]);
-    }
-
-    public function verify(Request $request, string $token = null)
-    {
-        if ($token) {
+        // QR / token verification
+        if ($token !== null && $token !== '') {
             $result = $this->verification->verifyByToken($token);
-        } else {
-            $number = (string) $request->query('number', '');
-            if ($number === '') {
-                return Inertia::render('Public/Verify', ['result' => null]);
-            }
-            $result = $this->verification->verifyByNumber($number);
+
+            return Inertia::render('Public/Verify', [
+                'result' => $result,
+            ]);
         }
+
+        // Manual certificate-number verification
+        $number = trim((string) $request->query('number', ''));
+
+        if ($number === '') {
+            return Inertia::render('Public/Verify', [
+                'result' => null,
+            ]);
+        }
+
+        $result = $this->verification->verifyByNumber($number);
 
         return Inertia::render('Public/Verify', [
             'result' => $result,

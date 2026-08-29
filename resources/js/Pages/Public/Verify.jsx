@@ -19,11 +19,18 @@ export default function Verify({ result }) {
     const [number, setNumber] = useState('');
 
     const lookup = (e) => {
-        e.preventDefault();
-        if (number.trim()) {
-            router.visit(`/verify?number=${encodeURIComponent(number.trim())}`, { preserveState: true });
-        }
-    };
+    e.preventDefault();
+
+    const value = number.trim();
+
+    if (!value) {
+        return;
+    }
+
+    router.visit(
+        `${route('public.verify')}?number=${encodeURIComponent(value)}`
+    );
+};
 
     return (
         <PublicLayout>
