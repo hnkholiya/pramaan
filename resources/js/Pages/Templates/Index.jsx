@@ -12,6 +12,16 @@ export default function Index({ templates }) {
                     <div className="flex justify-between items-center mb-6">
                         <p className="text-sm text-slate-500">Design reusable certificate layouts with versioning.</p>
                         <Link href={route('organization.templates.create')} className="bg-indigo-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-indigo-700">+ New Template</Link>
+                        
+
+<a
+    href={route('organization.templates.upload')}
+    className="inline-flex items-center rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700"
+>
+    Upload Template
+</a>
+
+
                     </div>
 
                     {templates.length === 0 ? (

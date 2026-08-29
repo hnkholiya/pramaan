@@ -10,14 +10,18 @@ use App\Services\PdfService;
 use App\Services\TemplateService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Symfony\Component\HttpFoundation\StreamedResponse;
+use App\Http\Requests\UploadTemplateRequest;
+use App\Services\TemplateImportService;
 
 class TemplateController extends Controller
 {
     public function __construct(
         private TemplateService $service,
         private PdfService $pdf,
+        private TemplateImportService $import,
     ) {}
 
     private function owned(Request $request, DocumentTemplate $template): DocumentTemplate
@@ -33,7 +37,7 @@ class TemplateController extends Controller
             ->withCount(['versions'])
             ->orderByDesc('created_at')
             ->get()
-            ->map(fn ($t) => [
+            ->map(fn($t) => [
                 'id' => $t->id,
                 'name' => $t->name,
                 'slug' => $t->slug,
@@ -49,8 +53,30 @@ class TemplateController extends Controller
     public function create(Request $request)
     {
         return Inertia::render('Templates/Create', [
-            'element_types' => array_map(fn ($e) => ['value' => $e->value, 'label' => $e->label()], TemplateElementType::cases()),
+            'element_types' => array_map(fn($e) => ['value' => $e->value, 'label' => $e->label()], TemplateElementType::cases()),
         ]);
+    }
+
+    public function uploadForm(Request $request)
+    {
+        return Inertia::render('Templates/Upload');
+    }
+
+    public function upload(UploadTemplateRequest $request)
+    {
+        $organization = $request->user()->currentOrganization();
+
+        $template = $this->import->import(
+            $organization,
+            $request->validated('name'),
+            $request->validated('description'),
+            $request->validated('orientation'),
+            $request->file('file'),
+        );
+
+        return redirect()
+            ->route('organization.templates.editor', $template)
+            ->with('success', 'Template uploaded successfully.');
     }
 
     public function store(StoreTemplateRequest $request)
@@ -75,6 +101,11 @@ class TemplateController extends Controller
     {
         $this->owned($request, $template);
 
+        $template->load([
+            'elements',
+            'activeAsset',
+        ]);
+
         return Inertia::render('Templates/Editor', [
             'template' => [
                 'id' => $template->id,
@@ -82,9 +113,32 @@ class TemplateController extends Controller
                 'canvas_width' => $template->canvas_width,
                 'canvas_height' => $template->canvas_height,
                 'orientation' => $template->orientation,
-                'elements' => $template->elements->map(fn ($e) => $this->elementShape($e)),
+
+                'asset' => $template->activeAsset
+                    ? [
+                        'id' => $template->activeAsset->id,
+                        'type' => $template->activeAsset->type,
+                        'original_name' => $template->activeAsset->original_name,
+                        'mime_type' => $template->activeAsset->mime_type,
+                        'path' => $template->activeAsset->path,
+                        'width' => $template->activeAsset->width,
+                        'height' => $template->activeAsset->height,
+                    ]
+                    : null,
+
+                'elements' => $template->elements->map(
+                    fn($e) => $this->elementShape($e)
+                ),
             ],
-            'element_types' => array_map(fn ($e) => ['value' => $e->value, 'label' => $e->label()], TemplateElementType::cases()),
+
+            'element_types' => array_map(
+                fn($e) => [
+                    'value' => $e->value,
+                    'label' => $e->label(),
+                ],
+                TemplateElementType::cases()
+            ),
+
             'has_been_used' => $this->service->hasBeenUsed($template),
         ]);
     }
@@ -175,7 +229,7 @@ class TemplateController extends Controller
 
         $pdf = $this->pdf->generate($version, $dummy);
 
-        return response()->streamDownload(fn () => print($pdf), 'preview.pdf', ['Content-Type' => 'application/pdf']);
+        return response()->streamDownload(fn() => print($pdf), 'preview.pdf', ['Content-Type' => 'application/pdf']);
     }
 
     private function elementShape(TemplateElement $e): array
@@ -192,4 +246,32 @@ class TemplateController extends Controller
             'sort_order' => $e->sort_order,
         ];
     }
+
+    public function assetPreview(
+    Request $request,
+    DocumentTemplate $template
+) {
+    $this->owned($request, $template);
+
+    $asset = $template->activeAsset;
+
+    abort_unless($asset, 404);
+
+    $disk = Storage::disk('local');
+
+    abort_unless(
+        $disk->exists($asset->path),
+        404
+    );
+
+    return response()->file(
+        $disk->path($asset->path),
+        [
+            'Content-Type' => $asset->mime_type,
+            'Content-Disposition' => 'inline; filename="' .
+                addslashes($asset->original_name) .
+                '"',
+        ]
+    );
+}
 }

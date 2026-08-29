@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class DocumentTemplate extends Model
 {
@@ -48,5 +49,11 @@ class DocumentTemplate extends Model
     public function elements(): HasMany
     {
         return $this->hasMany(TemplateElement::class)->orderBy('sort_order');
+    }
+
+    public function activeAsset(): HasOne
+    {
+        return $this->hasOne(TemplateAsset::class)
+            ->where('is_active', true);
     }
 }

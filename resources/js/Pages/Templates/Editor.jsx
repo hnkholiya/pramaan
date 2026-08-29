@@ -4,9 +4,13 @@ import { router } from '@inertiajs/react';
 
 let uid = 1;
 
-export default function Editor({ template, element_types, has_been_used }) {
+export default function Editor({
+    template,
+    element_types,
+    has_been_used,
+}) {
     const [elements, setElements] = useState(
-        template.elements.map((element) => ({
+        (template.elements || []).map((element) => ({
             ...element,
             _id: element.id || `e${uid++}`,
         }))
@@ -18,9 +22,12 @@ export default function Editor({ template, element_types, has_been_used }) {
     const canvasRef = useRef(null);
     const drag = useRef(null);
 
-    const selected = elements.find((element) => element._id === selectedId);
+    const selected = elements.find(
+        (element) => element._id === selectedId
+    );
 
     const scale = 0.5;
+
     const canvasW = template.canvas_width * scale;
     const canvasH = template.canvas_height * scale;
 
@@ -93,8 +100,12 @@ export default function Editor({ template, element_types, has_been_used }) {
             data_key: definition.data_key || null,
             config: definition.config || {},
             position: {
-                x: Math.round(template.canvas_width / 2 - 150),
-                y: Math.round(template.canvas_height / 2 - 20),
+                x: Math.round(
+                    template.canvas_width / 2 - 150
+                ),
+                y: Math.round(
+                    template.canvas_height / 2 - 20
+                ),
             },
             size: {
                 width: 300,
@@ -104,7 +115,11 @@ export default function Editor({ template, element_types, has_been_used }) {
             sort_order: elements.length,
         };
 
-        setElements((previous) => [...previous, newElement]);
+        setElements((previous) => [
+            ...previous,
+            newElement,
+        ]);
+
         setSelectedId(newElement._id);
     };
 
@@ -123,7 +138,9 @@ export default function Editor({ template, element_types, has_been_used }) {
 
     const removeElement = () => {
         setElements((previous) =>
-            previous.filter((element) => element._id !== selectedId)
+            previous.filter(
+                (element) => element._id !== selectedId
+            )
         );
 
         setSelectedId(null);
@@ -141,7 +158,10 @@ export default function Editor({ template, element_types, has_been_used }) {
         setSaving(true);
 
         router.post(
-            route('organization.templates.save-layout', template.id),
+            route(
+                'organization.templates.save-layout',
+                template.id
+            ),
             {
                 elements: payload,
             },
@@ -149,7 +169,9 @@ export default function Editor({ template, element_types, has_been_used }) {
                 preserveScroll: true,
 
                 onSuccess: () => {
-                    console.log('Pramaan: template layout saved successfully.');
+                    console.log(
+                        'Pramaan: template layout saved successfully.'
+                    );
                 },
 
                 onError: (errors) => {
@@ -174,8 +196,8 @@ export default function Editor({ template, element_types, has_been_used }) {
         drag.current = {
             startX: event.clientX,
             startY: event.clientY,
-            origX: selected.position.x,
-            origY: selected.position.y,
+            origX: selected.position?.x ?? 0,
+            origY: selected.position?.y ?? 0,
         };
 
         event.preventDefault();
@@ -186,18 +208,26 @@ export default function Editor({ template, element_types, has_been_used }) {
             return;
         }
 
-        const dx = (event.clientX - drag.current.startX) / scale;
-        const dy = (event.clientY - drag.current.startY) / scale;
+        const dx =
+            (event.clientX - drag.current.startX) / scale;
+
+        const dy =
+            (event.clientY - drag.current.startY) / scale;
 
         updateSelected({
             position: {
                 x: Math.max(
                     0,
-                    Math.round(drag.current.origX + dx)
+                    Math.round(
+                        drag.current.origX + dx
+                    )
                 ),
+
                 y: Math.max(
                     0,
-                    Math.round(drag.current.origY + dy)
+                    Math.round(
+                        drag.current.origY + dy
+                    )
                 ),
             },
         });
@@ -217,6 +247,7 @@ export default function Editor({ template, element_types, has_been_used }) {
         >
             <div className="py-6">
                 <div className="max-w-[1400px] mx-auto px-4 flex gap-4">
+
                     {/* Toolbar */}
                     <div className="w-60 bg-white rounded-xl shadow p-4 shrink-0">
                         <h3 className="text-sm font-semibold text-slate-700 mb-3">
@@ -247,6 +278,7 @@ export default function Editor({ template, element_types, has_been_used }) {
 
                         {selected && (
                             <div className="mt-4 border-t border-slate-100 pt-4">
+
                                 <div className="flex items-center justify-between">
                                     <h3 className="text-sm font-semibold text-slate-700">
                                         Properties
@@ -262,6 +294,7 @@ export default function Editor({ template, element_types, has_been_used }) {
                                 </div>
 
                                 <div className="mt-2 space-y-2 text-sm">
+
                                     <label className="block">
                                         <span className="text-xs text-slate-500">
                                             Name
@@ -323,6 +356,7 @@ export default function Editor({ template, element_types, has_been_used }) {
                                     )}
 
                                     <div className="grid grid-cols-2 gap-2">
+
                                         <label className="block">
                                             <span className="text-xs text-slate-500">
                                                 X
@@ -339,8 +373,7 @@ export default function Editor({ template, element_types, has_been_used }) {
                                                         position: {
                                                             ...selected.position,
                                                             x: Number(
-                                                                event.target
-                                                                    .value
+                                                                event.target.value
                                                             ),
                                                         },
                                                     })
@@ -364,8 +397,7 @@ export default function Editor({ template, element_types, has_been_used }) {
                                                         position: {
                                                             ...selected.position,
                                                             y: Number(
-                                                                event.target
-                                                                    .value
+                                                                event.target.value
                                                             ),
                                                         },
                                                     })
@@ -389,8 +421,7 @@ export default function Editor({ template, element_types, has_been_used }) {
                                                         size: {
                                                             ...selected.size,
                                                             width: Number(
-                                                                event.target
-                                                                    .value
+                                                                event.target.value
                                                             ),
                                                         },
                                                     })
@@ -414,8 +445,7 @@ export default function Editor({ template, element_types, has_been_used }) {
                                                         size: {
                                                             ...selected.size,
                                                             height: Number(
-                                                                event.target
-                                                                    .value
+                                                                event.target.value
                                                             ),
                                                         },
                                                     })
@@ -513,6 +543,7 @@ export default function Editor({ template, element_types, has_been_used }) {
                     {/* Canvas */}
                     <div className="flex-1 min-w-0">
                         <div className="bg-white rounded-xl shadow p-4">
+
                             <div className="flex items-center justify-between mb-3">
                                 <span className="text-xs text-slate-400">
                                     Click an element to select. Drag to move.
@@ -545,18 +576,37 @@ export default function Editor({ template, element_types, has_been_used }) {
                             </div>
 
                             <div className="bg-slate-100 rounded-lg p-4 overflow-auto">
+
                                 <div
                                     ref={canvasRef}
-                                    onMouseDown={startDrag}
                                     onMouseMove={onMove}
                                     onMouseUp={endDrag}
                                     onMouseLeave={endDrag}
-                                    className="relative bg-white shadow-lg"
+                                    className="relative bg-white shadow-lg overflow-hidden"
                                     style={{
                                         width: canvasW,
                                         height: canvasH,
                                     }}
                                 >
+
+                                    {/* Uploaded template background */}
+                                    {template.asset &&
+                                        template.asset.type === 'image' && (
+                                            <img
+                                                src={route(
+                                                    'organization.templates.asset',
+                                                    template.id
+                                                )}
+                                                alt={
+                                                    template.asset
+                                                        .original_name
+                                                }
+                                                className="absolute inset-0 w-full h-full object-fill pointer-events-none select-none"
+                                                draggable="false"
+                                            />
+                                        )}
+
+                                    {/* Template elements */}
                                     {elements.map((element) => {
                                         const isSelected =
                                             element._id === selectedId;
@@ -566,34 +616,37 @@ export default function Editor({ template, element_types, has_been_used }) {
                                                 key={element._id}
                                                 onClick={(event) => {
                                                     event.stopPropagation();
+
                                                     setSelectedId(
                                                         element._id
                                                     );
                                                 }}
                                                 onMouseDown={(event) => {
                                                     event.stopPropagation();
+
                                                     setSelectedId(
                                                         element._id
                                                     );
+
                                                     startDrag(event);
                                                 }}
                                                 className="absolute cursor-move flex items-center justify-center"
                                                 style={{
                                                     left:
-                                                        element.position.x *
-                                                        scale,
+                                                        (element.position?.x ??
+                                                            0) * scale,
 
                                                     top:
-                                                        element.position.y *
-                                                        scale,
+                                                        (element.position?.y ??
+                                                            0) * scale,
 
                                                     width:
-                                                        element.size.width *
-                                                        scale,
+                                                        (element.size?.width ??
+                                                            0) * scale,
 
                                                     height:
-                                                        element.size.height *
-                                                        scale,
+                                                        (element.size?.height ??
+                                                            0) * scale,
 
                                                     fontSize:
                                                         (element.styles
@@ -601,11 +654,13 @@ export default function Editor({ template, element_types, has_been_used }) {
                                                             14) * scale,
 
                                                     color:
-                                                        element.styles?.color ||
+                                                        element.styles
+                                                            ?.color ||
                                                         '#000',
 
                                                     textAlign:
-                                                        element.styles?.align ||
+                                                        element.styles
+                                                            ?.align ||
                                                         'left',
 
                                                     border: isSelected
@@ -613,10 +668,12 @@ export default function Editor({ template, element_types, has_been_used }) {
                                                         : '1px solid transparent',
 
                                                     overflow: 'hidden',
+
+                                                    zIndex: 10,
                                                 }}
                                             >
                                                 {element.type === 'QR_CODE'
-                                                    ? '◈ QR'
+                                                    ? '⌾ QR'
                                                     : element.type === 'IMAGE'
                                                       ? '🖼'
                                                       : label(element)}

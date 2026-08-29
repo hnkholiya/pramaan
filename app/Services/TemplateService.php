@@ -61,7 +61,7 @@ class TemplateService
         $slug = $base;
         $i = 1;
         while (DocumentTemplate::where('organization_id', $organization->id)->where('slug', $slug)->exists()) {
-            $slug = $base.'-'.$i++;
+            $slug = $base . '-' . $i++;
         }
 
         return $slug;
@@ -166,11 +166,21 @@ class TemplateService
                 'canvas_width' => $template->canvas_width,
                 'canvas_height' => $template->canvas_height,
                 'orientation' => $template->orientation,
+
+                'asset' => $template->activeAsset
+                    ? [
+                        'id' => $template->activeAsset->id,
+                        'type' => $template->activeAsset->type,
+                        'original_name' => $template->activeAsset->original_name,
+                        'mime_type' => $template->activeAsset->mime_type,
+                        'path' => $template->activeAsset->path,
+                    ]
+                    : null,
             ],
             'elements' => $template->elements()
                 ->orderBy('sort_order')
                 ->get()
-                ->map(fn (TemplateElement $e) => [
+                ->map(fn(TemplateElement $e) => [
                     'type' => $e->type->value,
                     'name' => $e->name,
                     'data_key' => $e->data_key,

@@ -48,19 +48,91 @@ Route::middleware('auth')->group(function () {
     Route::put('/organization', [OrganizationController::class, 'update'])->name('organization.update');
 
     // Templates
-    Route::get('/organization/templates', [TemplateController::class, 'index'])->name('organization.templates.index');
-    Route::get('/organization/templates/create', [TemplateController::class, 'create'])->name('organization.templates.create');
-    Route::post('/organization/templates', [TemplateController::class, 'store'])->name('organization.templates.store');
-    Route::get('/organization/templates/{template}', [TemplateController::class, 'show'])->name('organization.templates.show');
-    Route::get('/organization/templates/{template}/editor', [TemplateController::class, 'editor'])->name('organization.templates.editor');
-    Route::get('/organization/templates/{template}/preview', [TemplateController::class, 'preview'])->name('organization.templates.preview');
-    Route::put('/organization/templates/{template}', [TemplateController::class, 'update'])->name('organization.templates.update');
-    Route::delete('/organization/templates/{template}', [TemplateController::class, 'destroy'])->name('organization.templates.destroy');
-    Route::post('/organization/templates/{template}/elements', [TemplateController::class, 'storeElement'])->name('organization.templates.elements.store');
-    Route::put('/organization/templates/{template}/elements/{element}', [TemplateController::class, 'updateElement'])->name('organization.templates.elements.update');
-    Route::delete('/organization/templates/{template}/elements/{element}', [TemplateController::class, 'destroyElement'])->name('organization.templates.elements.destroy');
-    Route::post('/organization/templates/{template}/save-layout', [TemplateController::class, 'saveLayout'])->name('organization.templates.save-layout');
+    // Templates
+    Route::get(
+        '/organization/templates',
+        [TemplateController::class, 'index']
+    )->name('organization.templates.index');
 
+    Route::get(
+        '/organization/templates/create',
+        [TemplateController::class, 'create']
+    )->name('organization.templates.create');
+
+    Route::post(
+        '/organization/templates',
+        [TemplateController::class, 'store']
+    )->name('organization.templates.store');
+
+    /*
+|--------------------------------------------------------------------------
+| Upload Template
+|--------------------------------------------------------------------------
+*/
+    Route::get(
+        '/organization/templates/{template}/asset',
+        [TemplateController::class, 'assetPreview']
+    )->name('organization.templates.asset');
+    Route::get(
+        '/organization/templates/upload',
+        [TemplateController::class, 'uploadForm']
+    )->name('organization.templates.upload');
+
+    Route::post(
+        '/organization/templates/upload',
+        [TemplateController::class, 'upload']
+    )->name('organization.templates.upload.store');
+
+    /*
+|--------------------------------------------------------------------------
+| Template-specific routes
+|--------------------------------------------------------------------------
+*/
+
+    Route::get(
+        '/organization/templates/{template}',
+        [TemplateController::class, 'show']
+    )->name('organization.templates.show');
+
+    Route::get(
+        '/organization/templates/{template}/editor',
+        [TemplateController::class, 'editor']
+    )->name('organization.templates.editor');
+
+    Route::get(
+        '/organization/templates/{template}/preview',
+        [TemplateController::class, 'preview']
+    )->name('organization.templates.preview');
+
+    Route::put(
+        '/organization/templates/{template}',
+        [TemplateController::class, 'update']
+    )->name('organization.templates.update');
+
+    Route::delete(
+        '/organization/templates/{template}',
+        [TemplateController::class, 'destroy']
+    )->name('organization.templates.destroy');
+
+    Route::post(
+        '/organization/templates/{template}/elements',
+        [TemplateController::class, 'storeElement']
+    )->name('organization.templates.elements.store');
+
+    Route::put(
+        '/organization/templates/{template}/elements/{element}',
+        [TemplateController::class, 'updateElement']
+    )->name('organization.templates.elements.update');
+
+    Route::delete(
+        '/organization/templates/{template}/elements/{element}',
+        [TemplateController::class, 'destroyElement']
+    )->name('organization.templates.elements.destroy');
+
+    Route::post(
+        '/organization/templates/{template}/save-layout',
+        [TemplateController::class, 'saveLayout']
+    )->name('organization.templates.save-layout');
     // Batches
     Route::get('/organization/batches', [BatchController::class, 'index'])->name('organization.batches.index');
     Route::get('/organization/batches/create', [BatchController::class, 'create'])->name('organization.batches.create');
