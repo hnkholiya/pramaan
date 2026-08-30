@@ -18,6 +18,7 @@ use App\Services\TemplateImportService;
 use App\Http\Requests\GenerateAiTemplateRequest;
 use App\Services\AiService;
 
+
 class TemplateController extends Controller
 {
     public function __construct(
@@ -105,20 +106,59 @@ class TemplateController extends Controller
             $organization->name,
         );
 
-        $template = $this->service->create(
+        return response()->json([
+            'success' => true,
+            'template' => $data,
+        ]);
+    }
+
+
+    public function createFromAi(Request $request)
+    {
+        $organization = $request->user()->currentOrganization();
+
+        abort_unless(
             $organization,
-            $data
+            422,
+            'Please create your organization before creating a template.'
         );
 
-        return redirect()
-            ->route(
+        $data = $request->validate([
+            'template' => ['required', 'array'],
+            'template.name' => ['required', 'string', 'max:150'],
+            'template.description' => ['nullable', 'string', 'max:1000'],
+            'template.canvas_width' => ['required', 'integer', 'min:800', 'max:3000'],
+            'template.canvas_height' => ['required', 'integer', 'min:500', 'max:2000'],
+            'template.orientation' => ['required', 'in:landscape,portrait'],
+            'template.elements' => ['required', 'array', 'min:5', 'max:12'],
+        ]);
+
+        /*
+     * Never trust the browser's template payload directly.
+     *
+     * Run it through the same server-side AI business validation
+     * that was used immediately after Gemini generation.
+     */
+        $validatedTemplate = app(\App\Services\AiTemplateValidationService::class)
+            ->validate($data['template']);
+
+        /*
+     * Create through the existing TemplateService so template
+     * versioning and element persistence remain centralized.
+     */
+        $template = $this->service->create(
+            $organization,
+            $validatedTemplate
+        );
+
+        return response()->json([
+            'success' => true,
+            'template_id' => $template->id,
+            'redirect_url' => route(
                 'organization.templates.editor',
                 $template
-            )
-            ->with(
-                'success',
-                'AI template generated successfully.'
-            );
+            ),
+        ]);
     }
 
     public function show(Request $request, DocumentTemplate $template)
