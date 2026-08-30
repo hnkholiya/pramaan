@@ -15,6 +15,8 @@ use Inertia\Inertia;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use App\Http\Requests\UploadTemplateRequest;
 use App\Services\TemplateImportService;
+use App\Http\Requests\GenerateAiTemplateRequest;
+use App\Services\AiService;
 
 class TemplateController extends Controller
 {
@@ -22,6 +24,7 @@ class TemplateController extends Controller
         private TemplateService $service,
         private PdfService $pdf,
         private TemplateImportService $import,
+        private AiService $ai,
     ) {}
 
     private function owned(Request $request, DocumentTemplate $template): DocumentTemplate
@@ -85,6 +88,37 @@ class TemplateController extends Controller
         $template = $this->service->create($org, $request->validated());
 
         return redirect()->route('organization.templates.editor', $template)->with('success', 'Template created.');
+    }
+
+    public function generateWithAi(GenerateAiTemplateRequest $request)
+    {
+        $organization = $request->user()->currentOrganization();
+
+        abort_unless(
+            $organization,
+            422,
+            'Please create your organization before generating a template.'
+        );
+
+        $data = $this->ai->generateTemplateDesign(
+            $request->validated('prompt'),
+            $organization->name,
+        );
+
+        $template = $this->service->create(
+            $organization,
+            $data
+        );
+
+        return redirect()
+            ->route(
+                'organization.templates.editor',
+                $template
+            )
+            ->with(
+                'success',
+                'AI template generated successfully.'
+            );
     }
 
     public function show(Request $request, DocumentTemplate $template)
@@ -248,30 +282,30 @@ class TemplateController extends Controller
     }
 
     public function assetPreview(
-    Request $request,
-    DocumentTemplate $template
-) {
-    $this->owned($request, $template);
+        Request $request,
+        DocumentTemplate $template
+    ) {
+        $this->owned($request, $template);
 
-    $asset = $template->activeAsset;
+        $asset = $template->activeAsset;
 
-    abort_unless($asset, 404);
+        abort_unless($asset, 404);
 
-    $disk = Storage::disk('local');
+        $disk = Storage::disk('local');
 
-    abort_unless(
-        $disk->exists($asset->path),
-        404
-    );
+        abort_unless(
+            $disk->exists($asset->path),
+            404
+        );
 
-    return response()->file(
-        $disk->path($asset->path),
-        [
-            'Content-Type' => $asset->mime_type,
-            'Content-Disposition' => 'inline; filename="' .
-                addslashes($asset->original_name) .
-                '"',
-        ]
-    );
-}
+        return response()->file(
+            $disk->path($asset->path),
+            [
+                'Content-Type' => $asset->mime_type,
+                'Content-Disposition' => 'inline; filename="' .
+                    addslashes($asset->original_name) .
+                    '"',
+            ]
+        );
+    }
 }

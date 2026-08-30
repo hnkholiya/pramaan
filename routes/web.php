@@ -60,6 +60,11 @@ Route::middleware('auth')->group(function () {
     )->name('organization.templates.create');
 
     Route::post(
+        '/organization/templates/generate-ai',
+        [TemplateController::class, 'generateWithAi']
+    )->name('organization.templates.generate-ai');
+
+    Route::post(
         '/organization/templates',
         [TemplateController::class, 'store']
     )->name('organization.templates.store');

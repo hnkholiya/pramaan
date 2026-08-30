@@ -2,92 +2,191 @@
 
 namespace App\Services;
 
+use App\Ai\Agents\TemplateDesigner;
 use App\Models\CertificateBatch;
 use App\Models\DocumentTemplate;
+use RuntimeException;
+use Throwable;
 
-/**
- * AI-assisted workflows.
- *
- * AI is NEVER the source of truth for payment, authorization, integrity,
- * or blockchain state. It only assists (wording suggestions, CSV anomaly
- * analysis). When no provider key is configured, a deterministic local
- * heuristic is returned so the feature remains functional and testable.
- */
 class AiService
 {
-    public function isEnabled(): bool
-    {
-        return ! empty(config('ai.providers.openai.key'));
+    public function __construct(
+        private AiTemplateValidationService $templateValidator,
+    ) {
     }
 
     /**
-     * Suggest certificate wording (title, body, footer) for a template.
-     *
-     * @return array{title?: string, body?: string, footer?: string, note: string}
+     * Check whether Gemini AI is configured.
      */
-    public function suggestCertificateWording(DocumentTemplate $template, string $recipientName = ''): array
+    public function isEnabled(): bool
     {
+        return config('ai.default') === 'gemini'
+            && ! empty(config('ai.providers.gemini.key'));
+    }
+
+    /**
+     * Generate and validate a certificate template using Gemini.
+     *
+     * AI never writes directly to the database.
+     * The returned template has already passed Pramaan business validation.
+     *
+     * @return array{
+     *     name: string,
+     *     description: string,
+     *     canvas_width: int,
+     *     canvas_height: int,
+     *     orientation: string,
+     *     elements: array<int, array<string, mixed>>
+     * }
+     */
+    public function generateTemplateDesign(
+        string $prompt,
+        string $organizationName
+    ): array {
+        $prompt = trim($prompt);
+        $organizationName = trim($organizationName);
+
+        if ($prompt === '') {
+            throw new RuntimeException(
+                'Template generation prompt is required.'
+            );
+        }
+
+        if ($organizationName === '') {
+            throw new RuntimeException(
+                'Organization name is required.'
+            );
+        }
+
         if (! $this->isEnabled()) {
-            return $this->fallbackWording($template->name, $recipientName);
+            throw new RuntimeException(
+                'Gemini AI is not configured.'
+            );
         }
 
         try {
-            $prompt = "You are a professional certificate copywriter. Suggest a title, body, and footer for a certificate template named '{$template->name}'. Return JSON with keys: title, body, footer.";
+            $agent = new TemplateDesigner(
+                organizationName: $organizationName
+            );
 
-            $response = \Laravel\Ai\Ai::chat()->create([
-                'messages' => [
-                    ['role' => 'system', 'content' => 'Return only JSON.'],
-                    ['role' => 'user', 'content' => $prompt],
-                ],
-                'tools' => [
-                    \Laravel\Ai\Tool::make('return_wording', 'Return suggested wording', 'array', [
-                        'title' => 'string',
-                        'body' => 'string',
-                        'footer' => 'string',
-                    ])->using(fn ($args) => $args),
-                ],
-                'toolChoice' => 'return_wording',
-            ]);
+            $response = $agent->prompt(
+                $prompt,
+                provider: 'gemini',
+                model: config(
+                    'ai.providers.gemini.models.text.default',
+                    env('GEMINI_MODEL', 'gemini-3.6-flash')
+                ),
+            );
 
-            $text = $response->text();
-            $parsed = json_decode($text, true);
+            $generated = $response;
 
-            return [
-                'title' => $parsed['title'] ?? '',
-                'body' => $parsed['body'] ?? '',
-                'footer' => $parsed['footer'] ?? '',
-                'note' => 'AI generated',
-            ];
-        } catch (\Throwable $e) {
+            if (is_object($generated) && method_exists($generated, 'toArray')) {
+                $generated = $generated->toArray();
+            } elseif (is_object($generated)) {
+                $json = json_encode($generated);
+
+                if (json_last_error() === JSON_ERROR_NONE && is_string($json)) {
+                    $generated = json_decode($json, true);
+                }
+            } elseif (is_string($generated)) {
+                $decoded = json_decode($generated, true);
+
+                if (is_array($decoded)) {
+                    $generated = $decoded;
+                }
+            }
+
+            if (! is_array($generated)) {
+                throw new RuntimeException(
+                    'Gemini returned an invalid template response.'
+                );
+            }
+
+            return $this->templateValidator->validate(
+                $generated
+            );
+        } catch (Throwable $e) {
             report($e);
 
-            return $this->fallbackWording($template->name, $recipientName, 'AI unavailable, used local fallback.');
+            throw new RuntimeException(
+                'AI template generation failed: '.$e->getMessage(),
+                previous: $e
+            );
         }
     }
 
     /**
-     * Analyze a batch's CSV data for anomalies (no mutation).
+     * Suggest certificate wording.
+     *
+     * This remains deterministic for now.
+     * The Template Generator is the primary Gemini-powered workflow.
+     *
+     * @return array{
+     *     title: string,
+     *     body: string,
+     *     footer: string,
+     *     note: string
+     * }
+     */
+    public function suggestCertificateWording(
+        DocumentTemplate $template,
+        string $recipientName = ''
+    ): array {
+        return $this->fallbackWording(
+            $template->name,
+            $recipientName,
+            $this->isEnabled()
+                ? 'Gemini configured; wording assistant not enabled.'
+                : 'Gemini unavailable; used local fallback.'
+        );
+    }
+
+    /**
+     * Analyze a batch's CSV data for anomalies.
+     *
+     * This is read-only and does not mutate the batch.
      */
     public function analyzeCsv(CertificateBatch $batch): array
     {
-        $rows = $batch->records()->get()->map(fn ($r) => $r->source_data);
+        $rows = $batch
+            ->records()
+            ->get()
+            ->map(fn ($r) => $r->source_data);
+
         $anomalies = [];
         $total = $rows->count();
         $headers = $batch->original_headers ?? [];
 
         foreach ($headers as $header) {
-            $empty = $rows->filter(fn ($row) => trim((string) ($row[$header] ?? '')) === '')->count();
+            $empty = $rows
+                ->filter(
+                    fn ($row) =>
+                        trim((string) ($row[$header] ?? '')) === ''
+                )
+                ->count();
+
             if ($empty > 0) {
-                $anomalies[] = "Column '{$header}': {$empty}/{$total} records are empty.";
+                $anomalies[] =
+                    "Column '{$header}': {$empty}/{$total} records are empty.";
             }
         }
 
-        // Duplicate detection on first column.
+        // Duplicate detection on the first CSV column.
         $first = $headers[0] ?? null;
+
         if ($first) {
-            $counts = $rows->groupBy(fn ($row) => $row[$first] ?? null)->map->count()->filter(fn ($c) => $c > 1);
+            $counts = $rows
+                ->groupBy(
+                    fn ($row) => $row[$first] ?? null
+                )
+                ->map->count()
+                ->filter(
+                    fn ($count) => $count > 1
+                );
+
             foreach ($counts as $value => $count) {
-                $anomalies[] = "Potential duplicate '{$first}' = '{$value}' appears {$count} times.";
+                $anomalies[] =
+                    "Potential duplicate '{$first}' = '{$value}' appears {$count} times.";
             }
         }
 
@@ -95,16 +194,38 @@ class AiService
             $anomalies[] = 'No obvious anomalies detected.';
         }
 
-        return ['total_records' => $total, 'anomalies' => array_slice($anomalies, 0, 10)];
+        return [
+            'total_records' => $total,
+            'anomalies' => array_slice(
+                $anomalies,
+                0,
+                10
+            ),
+        ];
     }
 
-    private function fallbackWording(string $templateName, string $recipientName, string $note = 'Local heuristic'): array
-    {
+    /**
+     * Local wording fallback.
+     */
+    private function fallbackWording(
+        string $templateName,
+        string $recipientName,
+        string $note = 'Local heuristic'
+    ): array {
         $title = 'Certificate of Achievement';
-        $body = 'This is to certify that the recipient has successfully completed the '.$templateName.' program and is hereby awarded this certificate in recognition of the accomplishment.';
+
+        $body =
+            'This is to certify that the recipient has successfully completed the '
+            .$templateName
+            .' program and is hereby awarded this certificate in recognition of the accomplishment.';
 
         if ($recipientName !== '') {
-            $body = 'This is to certify that '.$recipientName.' has successfully completed the '.$templateName.' program and is hereby awarded this certificate in recognition of the accomplishment.';
+            $body =
+                'This is to certify that '
+                .$recipientName
+                .' has successfully completed the '
+                .$templateName
+                .' program and is hereby awarded this certificate in recognition of the accomplishment.';
         }
 
         return [
