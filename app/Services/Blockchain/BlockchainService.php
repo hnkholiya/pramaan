@@ -63,6 +63,10 @@ class BlockchainService
 
     /**
      * Check confirmation status and update the anchor.
+     *
+     * Important:
+     * "not confirmed yet" is NOT the same as "failed".
+     * Pending RPC/receipt state remains CONFIRMING so the queue job can retry.
      */
     public function confirmAnchor(
         MerkleAnchor $anchor,
@@ -74,22 +78,33 @@ class BlockchainService
             );
         }
 
-        // Do not re-check an anchor that is already finalized.
+        /*
+     * Already confirmed: idempotent.
+     */
         if (
             $anchor->status === BlockchainStatus::Confirmed
-            || $anchor->status === BlockchainStatus::Failed
         ) {
             return $anchor;
         }
 
-        $anchor->update([
-            'status' => BlockchainStatus::Confirming->value,
-        ]);
+        /*
+     * Move to confirming while checking the provider.
+     */
+        if (
+            $anchor->status !== BlockchainStatus::Confirming
+        ) {
+            $anchor->update([
+                'status' => BlockchainStatus::Confirming->value,
+            ]);
+        }
 
         $receipt = $this->provider->getTransactionStatus(
             $anchor->transaction_hash
         );
 
+        /*
+     * SUCCESS
+     */
         if ($receipt->status === 'confirmed') {
             $anchor->update([
                 'status' => BlockchainStatus::Confirmed->value,
@@ -108,60 +123,60 @@ class BlockchainService
                 ]
             );
 
-            return $anchor;
+            return $anchor->fresh();
         }
 
-        if ($receipt->status === 'pending') {
-            // A pending transaction is NOT a failure.
+        /*
+     * EXPLICIT BLOCKCHAIN FAILURE
+     */
+        if (
+            $receipt->status === 'failed'
+        ) {
+            $reason = $receipt->error
+                ?: 'Blockchain transaction failed.';
+
             $anchor->update([
-                'status' => BlockchainStatus::Confirming->value,
-                'failure_reason' => null,
+                'status' => BlockchainStatus::Failed->value,
+                'failure_reason' => $reason,
             ]);
 
-            return $anchor;
+            $this->activityLog->log(
+                ActivityAction::BlockchainFailed,
+                $anchor->organization_id,
+                subject: $anchor,
+                metadata: [
+                    'transaction_hash' => $anchor->transaction_hash,
+                    'reason' => $reason,
+                ]
+            );
+
+            return $anchor->fresh();
         }
 
-        // Only an actual failed/reverted receipt becomes Failed.
-        $reason = $receipt->error ?? 'blockchain transaction failed';
-
+        /*
+     * STILL PENDING
+     *
+     * This is the important fix.
+     */
         $anchor->update([
-            'status' => BlockchainStatus::Failed->value,
-            'failure_reason' => $reason,
+            'status' => BlockchainStatus::Confirming->value,
         ]);
 
-        $this->activityLog->log(
-            ActivityAction::BlockchainFailed,
-            $anchor->organization_id,
-            subject: $anchor,
-            metadata: [
-                'transaction_hash' => $anchor->transaction_hash,
-                'reason' => $reason,
-            ]
-        );
-
-        return $anchor;
+        return $anchor->fresh();
     }
 
     /**
-     * Submit + confirm in one call (used by jobs / seeders).
+     * Submit + perform one confirmation check.
+     *
+     * Kept for compatibility, but long-running confirmation is handled
+     * by ConfirmAnchorJob.
      */
     public function submitAndConfirm(
         MerkleAnchor $anchor
     ): MerkleAnchor {
         $this->submitAnchor($anchor);
 
-        try {
-            return $this->confirmAnchor($anchor);
-        } catch (Throwable $e) {
-            $anchor->update([
-                'status' => BlockchainStatus::Failed->value,
-                'failure_reason' => $e->getMessage(),
-            ]);
-
-            report($e);
-
-            return $anchor;
-        }
+        return $this->confirmAnchor($anchor);
     }
 
     private function networkLabel(): string

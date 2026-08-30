@@ -16,9 +16,12 @@ class ConfirmAnchorJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public int $tries = 10;
+    /**
+     * Laravel should not endlessly retry a permanently broken job.
+     */
+    public int $tries = 5;
 
-    public int $timeout = 120;
+    public int $timeout = 60;
 
     public function __construct(
         public int $anchorId
@@ -35,41 +38,63 @@ class ConfirmAnchorJob implements ShouldQueue
         }
 
         /*
-         * Already final — nothing more to do.
+         * Already final.
          */
         if (
-            $anchor->status === BlockchainStatus::Confirmed
+            $anchor->status === BlockchainStatus::Confirmed ||
+            $anchor->status === BlockchainStatus::Failed
         ) {
             return;
         }
 
+        /*
+         * Cannot confirm without a transaction hash.
+         */
         if (! $anchor->transaction_hash) {
             return;
         }
 
         try {
-            $blockchain->confirmAnchor($anchor);
+            $updated = $blockchain->confirmAnchor($anchor);
 
-            $anchor->refresh();
+            $updated->refresh();
+
+            if (
+                $updated->status === BlockchainStatus::Confirmed ||
+                $updated->status === BlockchainStatus::Failed
+            ) {
+                return;
+            }
 
             /*
-             * If still confirming, run this job again later.
+             * Still pending/confirming.
+             *
+             * Schedule another confirmation check.
              */
             if (
-                $anchor->status === BlockchainStatus::Confirming
+                $updated->status === BlockchainStatus::Confirming ||
+                $updated->status === BlockchainStatus::Submitted
             ) {
-                self::dispatch($anchor->id)
-                    ->delay(now()->addSeconds(15));
+                self::dispatch(
+                    $updated->id
+                )->delay(
+                    now()->addSeconds(15)
+                );
             }
         } catch (Throwable $e) {
+            /*
+             * Temporary RPC/network problems are retryable.
+             *
+             * Do not mark a valid transaction as failed merely because
+             * the RPC was temporarily unavailable.
+             */
             report($e);
 
-            /*
-             * Temporary RPC/network errors should not immediately
-             * destroy a valid blockchain transaction.
-             */
-            self::dispatch($anchor->id)
-                ->delay(now()->addSeconds(30));
+            self::dispatch(
+                $anchor->id
+            )->delay(
+                now()->addSeconds(30)
+            );
         }
     }
 }

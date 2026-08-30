@@ -14,6 +14,7 @@ use App\Models\MerkleAnchor;
 use App\Services\Blockchain\BlockchainService;
 use App\Services\Merkle\MerkleTreeService;
 use Illuminate\Support\Facades\DB;
+use App\Jobs\ConfirmAnchorJob;
 use RuntimeException;
 use Throwable;
 
@@ -66,7 +67,7 @@ class CertificateService
 
             $pdfBinary = $this->pdf->generate($version, $certificate);
 
-            $relative = 'certificates/'.$batch->organization_id.'/'.$certificate->certificate_number.'.pdf';
+            $relative = 'certificates/' . $batch->organization_id . '/' . $certificate->certificate_number . '.pdf';
             $this->storage->store($relative, $pdfBinary);
 
             // Hash the ACTUAL stored bytes.
@@ -121,51 +122,122 @@ class CertificateService
     /**
      * Build the Merkle tree from all issued certificate hashes and anchor
      * the single root on-chain. One anchor transaction per batch.
+     *
+     * Blockchain confirmation is asynchronous and retry-safe.
      */
     public function anchorBatch(CertificateBatch $batch): MerkleAnchor
     {
-        $certificates = $batch->certificates()->whereNotNull('pdf_hash')->get();
+        $certificates = $batch
+            ->certificates()
+            ->whereNotNull('pdf_hash')
+            ->get();
+
         if ($certificates->isEmpty()) {
-            throw new RuntimeException('No certificate hashes to anchor.');
+            throw new RuntimeException(
+                'No certificate hashes to anchor.'
+            );
         }
 
-        $hashes = $certificates->pluck('pdf_hash')->all();
+        $hashes = $certificates
+            ->pluck('pdf_hash')
+            ->all();
+
         $tree = $this->merkle->buildTree($hashes);
 
-        $anchor = DB::transaction(function () use ($batch, $tree, $certificates) {
-            $anchor = MerkleAnchor::create([
-                'organization_id' => $batch->organization_id,
-                'certificate_batch_id' => $batch->id,
-                'hash_algorithm' => MerkleTreeService::ALGORITHM,
-                'merkle_version' => MerkleTreeService::VERSION,
-                'leaf_count' => count($tree['leaves']),
-                'merkle_root' => $tree['root'],
-                'status' => \App\Enums\BlockchainStatus::Pending->value,
-            ]);
+        /*
+     * Idempotency:
+     *
+     * Reuse an existing anchor for the same batch/root instead of
+     * creating another database record or blockchain transaction.
+     */
+        $anchor = MerkleAnchor::where(
+            'certificate_batch_id',
+            $batch->id
+        )
+            ->where(
+                'merkle_root',
+                $tree['root']
+            )
+            ->latest()
+            ->first();
 
-            foreach ($certificates as $certificate) {
-                CertificateBlockchainRecord::create([
-                    'certificate_id' => $certificate->id,
-                    'merkle_anchor_id' => $anchor->id,
-                    'leaf_hash' => $certificate->pdf_hash,
-                    'proof' => $this->merkle->generateProof($tree['leaves'], $certificate->pdf_hash),
-                    'merkle_root' => $tree['root'],
-                ]);
-            }
+        if (! $anchor) {
+            $anchor = DB::transaction(
+                function () use (
+                    $batch,
+                    $tree,
+                    $certificates
+                ) {
+                    $anchor = MerkleAnchor::create([
+                        'organization_id' => $batch->organization_id,
+                        'certificate_batch_id' => $batch->id,
+                        'hash_algorithm' => MerkleTreeService::ALGORITHM,
+                        'merkle_version' => MerkleTreeService::VERSION,
+                        'leaf_count' => count($tree['leaves']),
+                        'merkle_root' => $tree['root'],
+                        'status' => \App\Enums\BlockchainStatus::Pending->value,
+                    ]);
 
-            $this->activityLog->log(ActivityAction::MerkleTreeCreated, $batch->organization_id, subject: $anchor, metadata: [
-                'leaves' => count($tree['leaves']),
-                'version' => $tree['version'],
-            ]);
-            $this->activityLog->log(ActivityAction::MerkleRootCreated, $batch->organization_id, subject: $anchor, metadata: [
-                'root' => $tree['root'],
-            ]);
+                    foreach ($certificates as $certificate) {
+                        CertificateBlockchainRecord::create([
+                            'certificate_id' => $certificate->id,
+                            'merkle_anchor_id' => $anchor->id,
+                            'leaf_hash' => $certificate->pdf_hash,
+                            'proof' => $this->merkle->generateProof(
+                                $tree['leaves'],
+                                $certificate->pdf_hash
+                            ),
+                            'merkle_root' => $tree['root'],
+                        ]);
+                    }
 
-            return $anchor;
-        });
+                    $this->activityLog->log(
+                        ActivityAction::MerkleTreeCreated,
+                        $batch->organization_id,
+                        subject: $anchor,
+                        metadata: [
+                            'leaves' => count($tree['leaves']),
+                            'version' => $tree['version'],
+                        ]
+                    );
 
-        // Blockchain submission + confirmation (mock or real).
-        $this->blockchain->submitAnchor($anchor);
+                    $this->activityLog->log(
+                        ActivityAction::MerkleRootCreated,
+                        $batch->organization_id,
+                        subject: $anchor,
+                        metadata: [
+                            'root' => $tree['root'],
+                        ]
+                    );
+
+                    return $anchor;
+                }
+            );
+        }
+
+        /*
+     * Idempotent blockchain submission.
+     *
+     * BlockchainService::submitAnchor() already avoids resubmitting
+     * when a transaction hash already exists.
+     */
+        $anchor = $this->blockchain->submitAnchor($anchor);
+
+        $anchor->refresh();
+
+        /*
+     * Confirmation happens asynchronously.
+     */
+        if (
+            $anchor->transaction_hash &&
+            $anchor->status !== \App\Enums\BlockchainStatus::Confirmed
+        ) {
+            ConfirmAnchorJob::dispatch(
+                $anchor->id
+            )->delay(
+                now()->addSeconds(10)
+            );
+        }
 
         return $anchor->fresh();
     }
