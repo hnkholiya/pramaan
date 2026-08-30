@@ -10,8 +10,10 @@ use Laravel\Ai\Contracts\HasTools;
 use Laravel\Ai\Contracts\Tool;
 use Laravel\Ai\Messages\Message;
 use Laravel\Ai\Promptable;
+use Laravel\Ai\Attributes\Timeout;
 use Stringable;
 
+#[Timeout(90)]
 class TemplateDesigner implements Agent, Conversational, HasStructuredOutput, HasTools
 {
     use Promptable;

@@ -76,6 +76,7 @@ class AiService
                     'ai.providers.gemini.models.text.default',
                     env('GEMINI_MODEL', 'gemini-3.6-flash')
                 ),
+                timeout: 90,
             );
 
             $generated = $response;

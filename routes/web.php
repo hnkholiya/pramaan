@@ -148,6 +148,10 @@ Route::middleware('auth')->group(function () {
     Route::get('/organization/batches/create', [BatchController::class, 'create'])->name('organization.batches.create');
     Route::post('/organization/batches', [BatchController::class, 'store'])->name('organization.batches.store');
     Route::get('/organization/batches/{batch}', [BatchController::class, 'show'])->name('organization.batches.show');
+    Route::get(
+        '/organization/batches/{batch}/download-zip',
+        [BatchController::class, 'downloadZip']
+    )->name('organization.batches.download-zip');
     Route::post('/organization/batches/{batch}/validate', [BatchController::class, 'validate'])->name('organization.batches.validate');
     Route::post('/organization/batches/{batch}/map', [BatchController::class, 'map'])->name('organization.batches.map');
     Route::post('/organization/batches/{batch}/quote', [BatchController::class, 'quote'])->name('organization.batches.quote');

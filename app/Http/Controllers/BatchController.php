@@ -15,6 +15,7 @@ use App\Services\Payment\PaymentService;
 use App\Services\PricingService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
+use App\Services\ZipService;
 
 class BatchController extends Controller
 {
@@ -24,6 +25,7 @@ class BatchController extends Controller
         private PricingService $pricing,
         private PaymentService $payment,
         private CertificateService $certificates,
+        private ZipService $zip,
     ) {}
 
     private function owned(Request $request, CertificateBatch $batch): CertificateBatch
@@ -39,7 +41,7 @@ class BatchController extends Controller
             ->with(['template', 'quote', 'merkleAnchor'])
             ->orderByDesc('created_at')
             ->get()
-            ->map(fn ($b) => [
+            ->map(fn($b) => [
                 'id' => $b->id,
                 'template' => $b->template?->name,
                 'status' => $b->status->value,
@@ -57,7 +59,7 @@ class BatchController extends Controller
     public function create(Request $request)
     {
         $templates = $request->user()->currentOrganization()->templates()->orderByDesc('updated_at')->get()
-            ->map(fn ($t) => ['id' => $t->id, 'name' => $t->name]);
+            ->map(fn($t) => ['id' => $t->id, 'name' => $t->name]);
 
         return Inertia::render('Batches/Create', ['templates' => $templates]);
     }
@@ -83,7 +85,7 @@ class BatchController extends Controller
         $dynamicFields = $batch->template->elements()
             ->where('type', 'DYNAMIC_FIELD')
             ->get()
-            ->map(fn ($e) => ['data_key' => $e->data_key, 'name' => $e->name])
+            ->map(fn($e) => ['data_key' => $e->data_key, 'name' => $e->name])
             ->values();
 
         return Inertia::render('Batches/Show', [
@@ -102,7 +104,7 @@ class BatchController extends Controller
                 'anchor_root' => $batch->merkleAnchor?->merkle_root,
                 'transaction_hash' => $batch->merkleAnchor?->transaction_hash,
             ],
-            'records' => $batch->records->map(fn ($r) => [
+            'records' => $batch->records->map(fn($r) => [
                 'id' => $r->id,
                 'row' => $r->row_number,
                 'data' => $r->source_data,
@@ -116,6 +118,32 @@ class BatchController extends Controller
             'dynamic_fields' => $dynamicFields,
             'payment_mode' => config('payments.provider'),
         ]);
+    }
+
+
+    /**
+     * Download all issued certificates in a batch as a ZIP archive.
+     */
+    public function downloadZip(
+        Request $request,
+        CertificateBatch $batch
+    ) {
+        $this->owned($request, $batch);
+
+        $result = $this->zip->createBatchZip($batch);
+
+        return response()
+            ->download(
+                $result['path'],
+                $result['filename'],
+                [
+                    'Content-Type' =>
+                    'application/zip',
+                    'Content-Disposition' =>
+                    'attachment; filename="' . $result['filename'] . '"',
+                ]
+            )
+            ->deleteFileAfterSend(true);
     }
 
     public function validate(Request $request, CertificateBatch $batch)
@@ -189,7 +217,7 @@ class BatchController extends Controller
         $payment = $this->payment->createOrderForQuote($quote);
         $this->payment->verifyAndCapture($payment, [
             'razorpay_order_id' => $payment->provider_order_id,
-            'razorpay_payment_id' => 'pay_'.random_int(1000, 9999),
+            'razorpay_payment_id' => 'pay_' . random_int(1000, 9999),
             'razorpay_signature' => 'mock_paid_signature',
         ]);
 

@@ -150,6 +150,24 @@ export default function Show({ batch, records, dynamic_fields, payment_mode }) {
                                 </ActionCard>
                             )}
 
+                            {/* Download all certificates */}
+{batch.status === 'completed' && batch.valid > 0 && (
+    <ActionCard
+        title="Download Certificates"
+        desc={`Download all ${batch.valid} issued certificates as a single ZIP file.`}
+    >
+        <a
+            href={route(
+                'organization.batches.download-zip',
+                batch.id
+            )}
+            className="inline-flex w-full items-center justify-center rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700"
+        >
+            ↓ Download All Certificates (ZIP)
+        </a>
+    </ActionCard>
+)}
+
                             {batch.status === 'completed' && batch.anchor_status && (
                                 <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 text-sm text-emerald-800">
                                     Batch issued and anchored. Certificates are verifiable via QR codes.
