@@ -82,10 +82,10 @@ class CsvService
             if (count($values) !== count($headers)) {
                 throw new RuntimeException(
                     'Row ' . ($i + 1) . ' has ' .
-                    count($values) .
-                    ' columns but headers have ' .
-                    count($headers) .
-                    '.'
+                        count($values) .
+                        ' columns but headers have ' .
+                        count($headers) .
+                        '.'
                 );
             }
 
@@ -128,7 +128,7 @@ class CsvService
         }
 
         return array_map(
-            static fn ($value) => trim((string) $value),
+            static fn($value) => trim((string) $value),
             $parts
         );
     }
@@ -232,10 +232,14 @@ class CsvService
      * - email
      * - date
      *
-     * Date format is intentionally strict:
+     
+     * Supported date formats:
      *
      * YYYY-MM-DD
-     *
+     * DD-MM-YYYY
+     * DD/MM/YYYY
+     * YYYY/MM/DD
+ 
      * @param string[] $requiredKeys
      * @param array<string,string> $rules
      */
@@ -335,24 +339,30 @@ class CsvService
      */
     private function isValidDate(string $value): bool
     {
-        // Strict format check first.
-        if (! preg_match(
-            '/^\d{4}-\d{2}-\d{2}$/',
-            $value
-        )) {
-            return false;
+        $value = trim($value);
+
+        $formats = [
+            'Y-m-d',
+            'd-m-Y',
+            'd/m/Y',
+            'Y/m/d',
+        ];
+
+        foreach ($formats as $format) {
+            $date = \DateTimeImmutable::createFromFormat(
+                '!' . $format,
+                $value
+            );
+
+            if (
+                $date !== false &&
+                $date->format($format) === $value
+            ) {
+                return true;
+            }
         }
 
-        [$year, $month, $day] = array_map(
-            'intval',
-            explode('-', $value)
-        );
-
-        return checkdate(
-            $month,
-            $day,
-            $year
-        );
+        return false;
     }
 
     /**
