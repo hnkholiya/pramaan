@@ -7,6 +7,7 @@ use App\Enums\CertificateStatus;
 use App\Models\Certificate;
 use App\Services\Blockchain\BlockchainService;
 use App\Services\Merkle\MerkleTreeService;
+use Throwable;
 
 /**
  * Public certificate verification. Runs all integrity checks and returns a
@@ -89,22 +90,60 @@ class VerificationService
         $checks['merkle_proof'] = ['valid' => $merkleValid, 'message' => $merkleMessage];
 
         // 4. Blockchain anchor
+        // 4. Blockchain anchor
         $blockchainValid = false;
         $blockchainMessage = 'Certificate is not anchored on the blockchain.';
-        if ($anchor && $anchor->transaction_hash && $anchor->status->value === 'confirmed') {
-            $blockchainValid = $this->merkle->verify($anchor->merkle_root, $certificate->pdf_hash, $blockchainRecord->proof ?? [])
-                && $anchor->status->value === 'confirmed';
-            $blockchainMessage = $blockchainValid
-                ? 'Blockchain anchor confirmed (transaction '.$anchor->transaction_hash.').'
-                : 'Blockchain anchor not confirmed.';
+
+        if (
+            $anchor
+            && $blockchainRecord
+            && $anchor->transaction_hash
+            && $anchor->status->value === 'confirmed'
+        ) {
+            $onChainRootValid = false;
+
+            try {
+                $onChainRootValid = $this->blockchain->isRootAnchored(
+                    $anchor->merkle_root
+                );
+            } catch (Throwable $e) {
+                report($e);
+
+                $blockchainMessage =
+                    'Blockchain anchor could not be checked.';
+            }
+
+            $proofValid = $this->merkle->verify(
+                $anchor->merkle_root,
+                $certificate->pdf_hash,
+                $blockchainRecord->proof ?? []
+            );
+
+            $blockchainValid = $proofValid && $onChainRootValid;
+
+            if ($blockchainValid) {
+                $blockchainMessage =
+                    'Blockchain anchor verified on Arbitrum Sepolia (transaction '
+                    . $anchor->transaction_hash . ').';
+            } elseif ($onChainRootValid && ! $proofValid) {
+                $blockchainMessage =
+                    'Blockchain root exists, but the certificate Merkle proof is invalid.';
+            } elseif (! $onChainRootValid) {
+                $blockchainMessage =
+                    'The stored Merkle root is not anchored on the blockchain.';
+            }
         }
-        $checks['blockchain_anchor'] = ['valid' => $blockchainValid, 'message' => $blockchainMessage];
+
+        $checks['blockchain_anchor'] = [
+            'valid' => $blockchainValid,
+            'message' => $blockchainMessage,
+        ];
 
         $overall = $statusValid && $pdfIntegrity && $merkleValid && $blockchainValid;
 
         $this->activityLog->log(ActivityAction::CertificateVerified, $certificate->organization_id, subject: $certificate, metadata: [
             'valid' => $overall,
-            'checks' => array_map(fn ($c) => $c['valid'], $checks),
+            'checks' => array_map(fn($c) => $c['valid'], $checks),
         ]);
 
         return $this->result($overall, 'verified', $checks, 'Certificate verified successfully.', $this->publicData($certificate));

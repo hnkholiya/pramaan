@@ -38,7 +38,7 @@ class BlockchainService
         if (! $anchor->transaction_hash) {
             $submission = $this->provider->anchorRoot([
                 'merkle_root' => $anchor->merkle_root,
-                'batch_identifier' => 'batch-'.$anchor->certificate_batch_id,
+                'batch_identifier' => 'batch-' . $anchor->certificate_batch_id,
             ]);
 
             $anchor->update([
@@ -64,37 +64,80 @@ class BlockchainService
     /**
      * Check confirmation status and update the anchor.
      */
-    public function confirmAnchor(MerkleAnchor $anchor, int $requiredBlocks = 0): MerkleAnchor
-    {
+    public function confirmAnchor(
+        MerkleAnchor $anchor,
+        int $requiredBlocks = 0
+    ): MerkleAnchor {
         if (! $anchor->transaction_hash) {
-            throw new RuntimeException('Anchor has no transaction hash to confirm.');
+            throw new RuntimeException(
+                'Anchor has no transaction hash to confirm.'
+            );
         }
 
-        $anchor->update(['status' => BlockchainStatus::Confirming->value]);
+        // Do not re-check an anchor that is already finalized.
+        if (
+            $anchor->status === BlockchainStatus::Confirmed
+            || $anchor->status === BlockchainStatus::Failed
+        ) {
+            return $anchor;
+        }
 
-        $receipt = $this->provider->getTransactionStatus($anchor->transaction_hash);
+        $anchor->update([
+            'status' => BlockchainStatus::Confirming->value,
+        ]);
+
+        $receipt = $this->provider->getTransactionStatus(
+            $anchor->transaction_hash
+        );
 
         if ($receipt->status === 'confirmed') {
             $anchor->update([
                 'status' => BlockchainStatus::Confirmed->value,
                 'block_number' => $receipt->blockNumber,
                 'confirmed_at' => now(),
+                'failure_reason' => null,
             ]);
-            $this->activityLog->log(ActivityAction::BlockchainConfirmed, $anchor->organization_id, subject: $anchor, metadata: [
-                'transaction_hash' => $anchor->transaction_hash,
-                'block_number' => $receipt->blockNumber,
-            ]);
-        } else {
-            $reason = $receipt->error ?? 'not yet confirmed';
+
+            $this->activityLog->log(
+                ActivityAction::BlockchainConfirmed,
+                $anchor->organization_id,
+                subject: $anchor,
+                metadata: [
+                    'transaction_hash' => $anchor->transaction_hash,
+                    'block_number' => $receipt->blockNumber,
+                ]
+            );
+
+            return $anchor;
+        }
+
+        if ($receipt->status === 'pending') {
+            // A pending transaction is NOT a failure.
             $anchor->update([
-                'status' => BlockchainStatus::Failed->value,
-                'failure_reason' => $reason,
+                'status' => BlockchainStatus::Confirming->value,
+                'failure_reason' => null,
             ]);
-            $this->activityLog->log(ActivityAction::BlockchainFailed, $anchor->organization_id, subject: $anchor, metadata: [
+
+            return $anchor;
+        }
+
+        // Only an actual failed/reverted receipt becomes Failed.
+        $reason = $receipt->error ?? 'blockchain transaction failed';
+
+        $anchor->update([
+            'status' => BlockchainStatus::Failed->value,
+            'failure_reason' => $reason,
+        ]);
+
+        $this->activityLog->log(
+            ActivityAction::BlockchainFailed,
+            $anchor->organization_id,
+            subject: $anchor,
+            metadata: [
                 'transaction_hash' => $anchor->transaction_hash,
                 'reason' => $reason,
-            ]);
-        }
+            ]
+        );
 
         return $anchor;
     }
@@ -102,25 +145,32 @@ class BlockchainService
     /**
      * Submit + confirm in one call (used by jobs / seeders).
      */
-    public function submitAndConfirm(MerkleAnchor $anchor): MerkleAnchor
-    {
+    public function submitAndConfirm(
+        MerkleAnchor $anchor
+    ): MerkleAnchor {
         $this->submitAnchor($anchor);
 
         try {
-            $this->confirmAnchor($anchor);
+            return $this->confirmAnchor($anchor);
         } catch (Throwable $e) {
             $anchor->update([
                 'status' => BlockchainStatus::Failed->value,
                 'failure_reason' => $e->getMessage(),
             ]);
-            report($e);
-        }
 
-        return $anchor;
+            report($e);
+
+            return $anchor;
+        }
     }
 
     private function networkLabel(): string
     {
         return config('blockchain.provider') === 'arbitrum' ? 'arbitrum' : 'mock';
+    }
+
+    public function isRootAnchored(string $merkleRoot): bool
+    {
+        return $this->provider->rootExists($merkleRoot);
     }
 }
