@@ -17,12 +17,17 @@ class AnchorBatchJob implements ShouldQueue
     public int $timeout = 300;
     public int $tries = 3;
 
-    public function __construct(public CertificateBatch $batch)
-    {
-    }
+    public function __construct(public CertificateBatch $batch) {}
 
-    public function handle(CertificateService $certificates): void
-    {
-        $certificates->anchorBatch($this->batch);
+    public function handle(
+        CertificateService $certificates
+    ): void {
+        $anchor = $certificates->anchorBatch($this->batch);
+
+        if ($anchor->transaction_hash) {
+            \App\Jobs\ConfirmAnchorJob::dispatch(
+                $anchor->id
+            )->delay(now()->addSeconds(10));
+        }
     }
 }

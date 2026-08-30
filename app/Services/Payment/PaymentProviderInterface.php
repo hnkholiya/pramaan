@@ -14,9 +14,15 @@ interface PaymentProviderInterface
     /**
      * Verify the payment callback signature server-side.
      *
-     * @param array $attributes e.g. ['razorpay_order_id','razorpay_payment_id','razorpay_signature']
+     * IMPORTANT:
+     * The authoritative Razorpay order ID must come from
+     * our own database, not from the browser callback.
      */
-    public function verifySignature(array $attributes): bool;
+    public function verifySignature(
+        string $orderId,
+        string $paymentId,
+        string $signature
+    ): bool;
 
     /**
      * Fetch authoritative payment status from the provider by payment id.

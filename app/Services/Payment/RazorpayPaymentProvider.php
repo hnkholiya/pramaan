@@ -5,10 +5,6 @@ namespace App\Services\Payment;
 use Razorpay\Api\Api;
 use RuntimeException;
 
-/**
- * Real Razorpay integration. Uses test or live mode via config/payments.php.
- * Never trusts the frontend callback; signature verification is server-side.
- */
 class RazorpayPaymentProvider implements PaymentProviderInterface
 {
     private Api $api;
@@ -19,17 +15,35 @@ class RazorpayPaymentProvider implements PaymentProviderInterface
         $secret = config('payments.razorpay.key_secret');
 
         if (! $key || ! $secret) {
-            throw new RuntimeException('Razorpay credentials are not configured.');
+            throw new RuntimeException(
+                'Razorpay credentials are not configured.'
+            );
         }
 
         $this->api = new Api($key, $secret);
     }
 
+    /**
+     * Create a Razorpay order server-side.
+     *
+     * Amount received from the application is in major currency units
+     * (for example INR 100.00) and is converted to paise here.
+     */
     public function createOrder(array $data): PaymentOrderResult
     {
+        $amount = (int) round(
+            ((float) $data['amount']) * 100
+        );
+
+        if ($amount <= 0) {
+            throw new RuntimeException(
+                'Payment amount must be greater than zero.'
+            );
+        }
+
         $order = $this->api->order->create([
             'receipt' => $data['receipt'],
-            'amount' => (int) round($data['amount'] * 100), // paise
+            'amount' => $amount,
             'currency' => $data['currency'],
             'notes' => $data['notes'] ?? [],
         ]);
@@ -39,29 +53,74 @@ class RazorpayPaymentProvider implements PaymentProviderInterface
             amount: $order['amount'],
             currency: $order['currency'],
             provider: 'razorpay',
-            meta: ['receipt' => $data['receipt']],
+            meta: [
+                'receipt' => $data['receipt'],
+                'status' => $order['status'] ?? null,
+            ],
         );
     }
 
-    public function verifySignature(array $attributes): bool
-    {
-        $signature = $attributes['razorpay_signature'] ?? null;
-        $orderId = $attributes['razorpay_order_id'] ?? null;
-        $paymentId = $attributes['razorpay_payment_id'] ?? null;
-
-        if (! $signature || ! $orderId || ! $paymentId) {
+    /**
+     * Verify Razorpay Checkout signature.
+     *
+     * The order ID MUST come from our database.
+     */
+    public function verifySignature(
+        string $orderId,
+        string $paymentId,
+        string $signature
+    ): bool {
+        if (
+            trim($orderId) === '' ||
+            trim($paymentId) === '' ||
+            trim($signature) === ''
+        ) {
             return false;
         }
 
-        $expected = hash_hmac('sha256', $orderId.'|'.$paymentId, config('payments.razorpay.key_secret'));
+        $secret = config('payments.razorpay.key_secret');
 
-        return hash_equals($expected, $signature);
+        if (! $secret) {
+            return false;
+        }
+
+        $expected = hash_hmac(
+            'sha256',
+            $orderId.'|'.$paymentId,
+            $secret
+        );
+
+        return hash_equals(
+            $expected,
+            $signature
+        );
     }
 
-    public function fetchPaymentStatus(string $paymentId): string
-    {
-        $payment = $this->api->payment->fetch($paymentId);
+    /**
+     * Fetch authoritative payment status from Razorpay.
+     */
+    public function fetchPaymentStatus(
+        string $paymentId
+    ): string {
+        if (trim($paymentId) === '') {
+            return 'unknown';
+        }
 
-        return $payment['status'] ?? 'unknown';
+        try {
+            $payment = $this->api
+                ->payment
+                ->fetch($paymentId);
+
+            return (string) (
+                $payment['status'] ?? 'unknown'
+            );
+        } catch (\Throwable $e) {
+            report($e);
+
+            throw new RuntimeException(
+                'Unable to fetch Razorpay payment status.',
+                previous: $e
+            );
+        }
     }
 }

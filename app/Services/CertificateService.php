@@ -165,8 +165,8 @@ class CertificateService
         });
 
         // Blockchain submission + confirmation (mock or real).
-        $this->blockchain->submitAndConfirm($anchor);
+        $this->blockchain->submitAnchor($anchor);
 
-        return $anchor;
+        return $anchor->fresh();
     }
 }

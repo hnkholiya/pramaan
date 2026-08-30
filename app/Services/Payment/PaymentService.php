@@ -40,7 +40,7 @@ class PaymentService
         }
 
         return DB::transaction(function () use ($quote) {
-            $receipt = 'batch-'.$quote->certificate_batch_id;
+            $receipt = 'batch-' . $quote->certificate_batch_id;
 
             $order = $this->provider->createOrder([
                 'receipt' => $receipt,
@@ -77,57 +77,221 @@ class PaymentService
     }
 
     /**
-     * Server-side payment verification. The browser callback is never trusted.
+     * Server-side payment verification.
      *
-     * Idempotent: a payment already captured returns without side effects.
+     * The browser callback is never the source of truth.
+     * The Razorpay order ID is taken from our Payment record.
      */
-    public function verifyAndCapture(Payment $payment, array $attributes): Payment
-    {
+    public function verifyAndCapture(
+        Payment $payment,
+        array $attributes
+    ): Payment {
         if ($payment->status === PaymentStatus::Captured) {
-            return $payment; // idempotent
-        }
-
-        if (! $this->provider->verifySignature($attributes)) {
-            $payment->update(['status' => PaymentStatus::Failed->value]);
-            $this->activityLog->log(ActivityAction::PaymentFailed, $payment->organization_id, subject: $payment, metadata: [
-                'reason' => 'signature_mismatch',
-            ]);
-
-            throw new RuntimeException('Payment signature verification failed.');
-        }
-
-        // Authoritative provider status check.
-        $providerStatus = $this->provider->fetchPaymentStatus($attributes['razorpay_payment_id'] ?? '');
-        if ($providerStatus !== 'captured') {
-            $payment->update(['status' => PaymentStatus::Failed->value]);
-            $this->activityLog->log(ActivityAction::PaymentFailed, $payment->organization_id, subject: $payment, metadata: [
-                'provider_status' => $providerStatus,
-            ]);
-
-            throw new RuntimeException('Payment was not captured by the provider.');
-        }
-
-        return DB::transaction(function () use ($payment, $attributes) {
-            $payment->update([
-                'provider_payment_id' => $attributes['razorpay_payment_id'] ?? null,
-                'provider_signature' => $attributes['razorpay_signature'] ?? null,
-                'status' => PaymentStatus::Captured->value,
-                'verified_at' => now(),
-            ]);
-
-            $quote = $payment->quote;
-            if ($quote) {
-                $quote->update(['status' => QuoteStatus::Paid->value]);
-            }
-
-            $batch = $payment->batch;
-            $batch->update(['status' => BatchStatus::Paid->value]);
-
-            $this->activityLog->log(ActivityAction::PaymentVerified, $payment->organization_id, subject: $payment);
-            $this->activityLog->log(ActivityAction::BatchMarkedPaid, $batch->organization_id, subject: $batch);
-
             return $payment;
-        });
+        }
+
+        $paymentId = trim(
+            (string) ($attributes['razorpay_payment_id'] ?? '')
+        );
+
+        $signature = trim(
+            (string) ($attributes['razorpay_signature'] ?? '')
+        );
+
+        /*
+     * IMPORTANT:
+     *
+     * Do NOT use:
+     *
+     * $attributes['razorpay_order_id']
+     *
+     * for signature generation.
+     *
+     * The authoritative order ID is the one we created and
+     * stored in payments.provider_order_id.
+     */
+        $serverOrderId = trim(
+            (string) $payment->provider_order_id
+        );
+
+        if (
+            $serverOrderId === '' ||
+            $paymentId === '' ||
+            $signature === ''
+        ) {
+            $payment->update([
+                'status' => PaymentStatus::Failed->value,
+            ]);
+
+            $this->activityLog->log(
+                ActivityAction::PaymentFailed,
+                $payment->organization_id,
+                subject: $payment,
+                metadata: [
+                    'reason' => 'missing_verification_fields',
+                ]
+            );
+
+            throw new RuntimeException(
+                'Missing Razorpay payment verification fields.'
+            );
+        }
+
+        /*
+     * Protect against a payment callback for a different
+     * Razorpay order.
+     */
+        $callbackOrderId = trim(
+            (string) ($attributes['razorpay_order_id'] ?? '')
+        );
+
+        if (
+            $callbackOrderId !== '' &&
+            ! hash_equals(
+                $serverOrderId,
+                $callbackOrderId
+            )
+        ) {
+            $payment->update([
+                'status' => PaymentStatus::Failed->value,
+            ]);
+
+            $this->activityLog->log(
+                ActivityAction::PaymentFailed,
+                $payment->organization_id,
+                subject: $payment,
+                metadata: [
+                    'reason' => 'order_id_mismatch',
+                ]
+            );
+
+            throw new RuntimeException(
+                'Razorpay order mismatch.'
+            );
+        }
+
+        /*
+     * Verify HMAC using the SERVER-SIDE order ID.
+     */
+        if (! $this->provider->verifySignature(
+            $serverOrderId,
+            $paymentId,
+            $signature
+        )) {
+            $payment->update([
+                'status' => PaymentStatus::Failed->value,
+            ]);
+
+            $this->activityLog->log(
+                ActivityAction::PaymentFailed,
+                $payment->organization_id,
+                subject: $payment,
+                metadata: [
+                    'reason' => 'signature_mismatch',
+                ]
+            );
+
+            throw new RuntimeException(
+                'Payment signature verification failed.'
+            );
+        }
+
+        /*
+     * Signature proves authenticity of the callback.
+     *
+     * Provider status proves that the payment is actually
+     * captured and can be fulfilled.
+     */
+        $providerStatus = $this->provider
+            ->fetchPaymentStatus($paymentId);
+
+        if ($providerStatus !== 'captured') {
+            $payment->update([
+                'status' => PaymentStatus::Failed->value,
+            ]);
+
+            $this->activityLog->log(
+                ActivityAction::PaymentFailed,
+                $payment->organization_id,
+                subject: $payment,
+                metadata: [
+                    'provider_status' => $providerStatus,
+                ]
+            );
+
+            throw new RuntimeException(
+                'Payment was not captured by Razorpay.'
+            );
+        }
+
+        /*
+     * Idempotent finalization.
+     */
+        return DB::transaction(
+            function () use (
+                $payment,
+                $paymentId,
+                $signature,
+                $serverOrderId
+            ) {
+                $payment->refresh();
+
+                if ($payment->status === PaymentStatus::Captured) {
+                    return $payment;
+                }
+
+                /*
+             * Ensure the stored provider order ID has not changed.
+             */
+                if (
+                    $payment->provider_order_id !==
+                    $serverOrderId
+                ) {
+                    throw new RuntimeException(
+                        'Stored Razorpay order ID changed unexpectedly.'
+                    );
+                }
+
+                $payment->update([
+                    'provider_payment_id' => $paymentId,
+                    'provider_signature' => $signature,
+                    'status' => PaymentStatus::Captured->value,
+                    'verified_at' => now(),
+                ]);
+
+                $quote = $payment->quote;
+
+                if ($quote) {
+                    $quote->update([
+                        'status' => QuoteStatus::Paid->value,
+                    ]);
+                }
+
+                $batch = $payment->batch;
+
+                $batch->update([
+                    'status' => BatchStatus::Paid->value,
+                ]);
+
+                $this->activityLog->log(
+                    ActivityAction::PaymentVerified,
+                    $payment->organization_id,
+                    subject: $payment,
+                    metadata: [
+                        'order_id' => $serverOrderId,
+                        'payment_id' => $paymentId,
+                    ]
+                );
+
+                $this->activityLog->log(
+                    ActivityAction::BatchMarkedPaid,
+                    $batch->organization_id,
+                    subject: $batch
+                );
+
+                return $payment;
+            }
+        );
     }
 
     /**
