@@ -189,4 +189,23 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::get('/certificates', [AdminController::class, 'certificates'])->name('certificates');
     Route::get('/payments', [AdminController::class, 'payments'])->name('payments');
     Route::get('/activity', [AdminController::class, 'activity'])->name('activity');
+
+    Route::prefix('organizations')
+        ->name('organizations.')
+        ->group(function () {
+            Route::get('/', [
+                AdminController::class,
+                'organizations',
+            ])->name('index');
+
+            Route::get('/{organization}', [
+                AdminController::class,
+                'show',
+            ])->name('show');
+
+            Route::patch('/{organization}/status', [
+                AdminController::class,
+                'updateStatus',
+            ])->name('update-status');
+        });
 });
