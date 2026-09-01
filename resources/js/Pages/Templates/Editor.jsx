@@ -169,6 +169,10 @@ const TYPE_ICON = {
     VERIFICATION_URL: LinkIcon,
     QR_CODE: QrCodeIcon,
     IMAGE: ImageIcon,
+    RECTANGLE: LayersIcon,
+    LINE: LayersIcon,
+    BACKGROUND: LayersIcon,
+    DECORATION: LayersIcon,
 };
 
 function typeIconFor(type) {
@@ -213,63 +217,140 @@ export default function Editor({
         const defs = {
             TEXT: {
                 name: 'Text',
-                config: {
-                    text: 'Your text',
-                },
+                config: { text: 'Your text' },
                 styles: {
                     font_size: 24,
                     align: 'left',
                     color: '#000000',
                 },
+                size: { width: 300, height: 40 },
             },
 
             DYNAMIC_FIELD: {
                 name: 'Dynamic Field',
                 data_key: 'recipient_name',
+                config: {},
                 styles: {
                     font_size: 28,
                     align: 'center',
                     color: '#111827',
                 },
+                size: { width: 300, height: 40 },
             },
 
             CERTIFICATE_NUMBER: {
                 name: 'Certificate Number',
+                config: {},
                 styles: {
                     font_size: 12,
                     align: 'left',
                     color: '#6b7280',
                 },
+                size: { width: 300, height: 30 },
             },
 
             VERIFICATION_URL: {
                 name: 'Verification URL',
+                config: {},
                 styles: {
                     font_size: 10,
                     align: 'center',
                     color: '#2563eb',
                 },
+                size: { width: 400, height: 30 },
             },
 
             QR_CODE: {
                 name: 'QR Code',
-                styles: {
-                    font_size: 10,
-                },
-                config: {
-                    size: 120,
-                },
+                styles: {},
+                config: { size: 120 },
+                size: { width: 120, height: 120 },
             },
 
             IMAGE: {
                 name: 'Image',
                 styles: {},
+                config: {},
+                size: { width: 220, height: 140 },
+            },
+
+            RECTANGLE: {
+                name: 'Rectangle',
+                config: {
+                    fill: 'transparent',
+                    border_color: '#D4AF37',
+                    border_width: 3,
+                    radius: 8,
+                },
+                styles: {},
+                size: { width: 500, height: 250 },
+            },
+
+            LINE: {
+                name: 'Line',
+                config: {
+                    orientation: 'horizontal',
+                    color: '#D4AF37',
+                    thickness: 3,
+                },
+                styles: {},
+                size: { width: 500, height: 3 },
+            },
+
+            BACKGROUND: {
+                name: 'Background',
+                config: { color: '#FFFFFF' },
+                styles: {},
+                size: {
+                    width: template.canvas_width,
+                    height: template.canvas_height,
+                },
+            },
+
+            DECORATION: {
+                name: 'Decoration',
+                config: {
+                    variant: 'corner',
+                    color: '#D4AF37',
+                    secondary_color: null,
+                },
+                styles: {},
+                size: { width: 100, height: 100 },
             },
         };
 
         const definition = defs[type] || {
             name: type,
+            config: {},
+            styles: {},
+            size: { width: 300, height: 40 },
         };
+
+        const defaultWidth = definition.size?.width ?? 300;
+        const defaultHeight = definition.size?.height ?? 40;
+
+        const maxX = Math.max(
+            0,
+            template.canvas_width - defaultWidth
+        );
+
+        const maxY = Math.max(
+            0,
+            template.canvas_height - defaultHeight
+        );
+
+        let defaultX = Math.round(
+            template.canvas_width / 2 - defaultWidth / 2
+        );
+
+        let defaultY = Math.round(
+            template.canvas_height / 2 - defaultHeight / 2
+        );
+
+        if (type === 'BACKGROUND') {
+            defaultX = 0;
+            defaultY = 0;
+        }
 
         const newElement = {
             _id: `e${uid++}`,
@@ -278,16 +359,12 @@ export default function Editor({
             data_key: definition.data_key || null,
             config: definition.config || {},
             position: {
-                x: Math.round(
-                    template.canvas_width / 2 - 150
-                ),
-                y: Math.round(
-                    template.canvas_height / 2 - 20
-                ),
+                x: Math.max(0, Math.min(maxX, defaultX)),
+                y: Math.max(0, Math.min(maxY, defaultY)),
             },
             size: {
-                width: 300,
-                height: 40,
+                width: defaultWidth,
+                height: defaultHeight,
             },
             styles: definition.styles || {},
             sort_order: elements.length,
@@ -313,6 +390,26 @@ export default function Editor({
                     : element
             )
         );
+    };
+
+    const updateSelectedConfig = (patch) => {
+        if (!selected) return;
+        updateSelected({
+            config: {
+                ...(selected.config || {}),
+                ...patch,
+            },
+        });
+    };
+
+    const updateSelectedStyles = (patch) => {
+        if (!selected) return;
+        updateSelected({
+            styles: {
+                ...(selected.styles || {}),
+                ...patch,
+            },
+        });
     };
 
     const removeElement = () => {
@@ -373,7 +470,7 @@ export default function Editor({
     };
 
     const startDrag = (event) => {
-        if (!selected) {
+        if (!selected || selected.type === 'BACKGROUND') {
             return;
         }
 
@@ -582,6 +679,221 @@ export default function Editor({
         return () => document.removeEventListener('keydown', handleKeyDown);
     }, [selectedId]);
 
+    const designTypes = [
+        'RECTANGLE',
+        'LINE',
+        'BACKGROUND',
+        'DECORATION',
+    ];
+
+    const contentTypes = [
+        'TEXT',
+        'DYNAMIC_FIELD',
+        'CERTIFICATE_NUMBER',
+        'VERIFICATION_URL',
+    ];
+
+    const renderDecoration = (element) => {
+        const config = element.config || {};
+        const color = config.color || '#D4AF37';
+        const secondaryColor = config.secondary_color || color;
+
+        switch (config.variant) {
+            case 'double_corner':
+                return (
+                    <div className="relative h-full w-full">
+                        <div
+                            className="absolute left-0 top-0 h-1/2 w-1/2"
+                            style={{
+                                borderLeft: `3px solid ${color}`,
+                                borderTop: `3px solid ${color}`,
+                            }}
+                        />
+                        <div
+                            className="absolute left-2 top-2 h-[40%] w-[40%]"
+                            style={{
+                                borderLeft: `1px solid ${secondaryColor}`,
+                                borderTop: `1px solid ${secondaryColor}`,
+                            }}
+                        />
+                    </div>
+                );
+
+            case 'seal':
+                return (
+                    <div className="flex h-full w-full items-center justify-center">
+                        <div
+                            className="flex h-[80%] w-[80%] items-center justify-center rounded-full border-2"
+                            style={{ borderColor: color }}
+                        >
+                            <div
+                                className="flex h-[65%] w-[65%] items-center justify-center rounded-full border"
+                                style={{
+                                    borderColor: secondaryColor,
+                                    fontSize: '0.55em',
+                                    fontWeight: 700,
+                                }}
+                            >
+                                SEAL
+                            </div>
+                        </div>
+                    </div>
+                );
+
+            case 'divider':
+                return (
+                    <div className="relative flex h-full w-full items-center justify-center">
+                        <div
+                            className="h-px w-[80%]"
+                            style={{ backgroundColor: color }}
+                        />
+                        <div
+                            className="absolute h-2 w-2 rotate-45"
+                            style={{ backgroundColor: secondaryColor }}
+                        />
+                    </div>
+                );
+
+            case 'ornament':
+                return (
+                    <div className="flex h-full w-full items-center justify-center">
+                        <div
+                            className="h-[65%] w-[65%] rotate-45 border-2"
+                            style={{ borderColor: color }}
+                        >
+                            <div
+                                className="h-full w-full border"
+                                style={{ borderColor: secondaryColor }}
+                            />
+                        </div>
+                    </div>
+                );
+
+            case 'corner':
+            default:
+                return (
+                    <div className="relative h-full w-full">
+                        <div
+                            className="absolute left-0 top-0 h-full w-full"
+                            style={{
+                                borderLeft: `4px solid ${color}`,
+                                borderTop: `4px solid ${color}`,
+                            }}
+                        />
+                        <div
+                            className="absolute left-3 top-3 h-[60%] w-[60%]"
+                            style={{
+                                borderLeft: `1px solid ${secondaryColor}`,
+                                borderTop: `1px solid ${secondaryColor}`,
+                            }}
+                        />
+                    </div>
+                );
+        }
+    };
+
+    const visualElementStyle = (element, isSelected) => {
+        const config = element.config || {};
+        const isBackground = element.type === 'BACKGROUND';
+        const base = {
+            position: 'absolute',
+            left: (element.position?.x ?? 0) * scale,
+            top: (element.position?.y ?? 0) * scale,
+            width: (element.size?.width ?? 0) * scale,
+            height: (element.size?.height ?? 0) * scale,
+            overflow: 'hidden',
+            zIndex: isBackground
+                ? 0
+                : 10 + (element.sort_order ?? 0),
+        };
+
+        if (element.type === 'BACKGROUND') {
+            return {
+                ...base,
+                backgroundColor: config.color || '#FFFFFF',
+                pointerEvents: 'none',
+            };
+        }
+
+        if (element.type === 'RECTANGLE') {
+            return {
+                ...base,
+                backgroundColor:
+                    config.fill === 'transparent'
+                        ? 'transparent'
+                        : config.fill || 'transparent',
+                border: `${Math.max(
+                    0,
+                    Number(config.border_width || 0)
+                ) * scale}px solid ${
+                    config.border_color || '#D4AF37'
+                }`,
+                borderRadius: `${Math.max(
+                    0,
+                    Number(config.radius || 0)
+                ) * scale}px`,
+            };
+        }
+
+        if (element.type === 'LINE') {
+            const thickness = Math.max(
+                1,
+                Number(config.thickness || 2)
+            ) * scale;
+
+            return {
+                ...base,
+                backgroundColor: config.color || '#D4AF37',
+                width:
+                    config.orientation === 'vertical'
+                        ? thickness
+                        : base.width,
+                height:
+                    config.orientation === 'vertical'
+                        ? base.height
+                        : thickness,
+            };
+        }
+
+        if (element.type === 'DECORATION') {
+            return {
+                ...base,
+                color: config.color || '#D4AF37',
+                opacity: element.styles?.opacity ?? 1,
+            };
+        }
+
+        return null;
+    };
+
+    const renderCanvasContent = (element) => {
+        if (designTypes.includes(element.type)) {
+            if (element.type === 'DECORATION') {
+                return renderDecoration(element);
+            }
+            return null;
+        }
+
+        if (element.type === 'QR_CODE') {
+            return (
+                <span className="inline-flex items-center gap-1 text-current">
+                    <QrCodeIcon className="h-[1em] w-[1em]" />
+                    QR
+                </span>
+            );
+        }
+
+        if (element.type === 'IMAGE') {
+            return (
+                <span className="inline-flex items-center gap-1 text-current">
+                    <ImageIcon className="h-[1em] w-[1em]" />
+                </span>
+            );
+        }
+
+        return label(element);
+    };
+
     return (
         <AuthenticatedLayout
             header={
@@ -754,14 +1066,50 @@ export default function Editor({
                                                 />
                                             )}
 
-                                        {/* Template elements — single positioned div per element,     */}
-                                        {/* identical left/top/width/height math to before. The         */}
-                                        {/* selection name-tag is a child of this same div, so it        */}
-                                        {/* inherits this element's position as its own containing       */}
-                                        {/* block and never shifts the element itself.                   */}
+                                        {/* Template elements — friend frontend interaction model plus
+                                            backend visual-design element support. */}
                                         {elements.map((element) => {
                                             const isSelected =
                                                 element._id === selectedId;
+                                            const isDesign =
+                                                designTypes.includes(element.type);
+                                            const style = isDesign
+                                                ? visualElementStyle(element, isSelected)
+                                                : {
+                                                      position: 'absolute',
+                                                      left: (element.position?.x ?? 0) * scale,
+                                                      top: (element.position?.y ?? 0) * scale,
+                                                      width: (element.size?.width ?? 0) * scale,
+                                                      height: (element.size?.height ?? 0) * scale,
+                                                      fontSize: (element.styles?.font_size || 14) * scale,
+                                                      color: element.styles?.color || '#000',
+                                                      textAlign: element.styles?.align || 'left',
+                                                      border: isSelected
+                                                          ? '2px dashed #6366f1'
+                                                          : '1px dashed transparent',
+                                                      outline: isSelected
+                                                          ? '4px solid rgba(99,102,241,0.08)'
+                                                          : 'none',
+                                                      overflow: 'hidden',
+                                                      zIndex: isSelected
+                                                          ? 1000
+                                                          : 100 + (element.sort_order ?? 0),
+                                                      display: 'flex',
+                                                      alignItems: 'center',
+                                                      justifyContent:
+                                                          element.styles?.align === 'right'
+                                                              ? 'flex-end'
+                                                              : element.styles?.align === 'center'
+                                                                ? 'center'
+                                                                : 'flex-start',
+                                                      fontWeight: element.styles?.bold ? 700 : 400,
+                                                      fontStyle: element.styles?.italic ? 'italic' : 'normal',
+                                                  };
+
+                                            if (isSelected) {
+                                                style.border = '2px dashed #6366f1';
+                                                style.outline = '4px solid rgba(99,102,241,0.08)';
+                                            }
 
                                             return (
                                                 <div
@@ -777,22 +1125,8 @@ export default function Editor({
                                                         setMobilePanel('properties');
                                                         startDrag(event);
                                                     }}
-                                                    className="absolute flex cursor-move items-center justify-center transition-colors"
-                                                    style={{
-                                                        left: (element.position?.x ?? 0) * scale,
-                                                        top: (element.position?.y ?? 0) * scale,
-                                                        width: (element.size?.width ?? 0) * scale,
-                                                        height: (element.size?.height ?? 0) * scale,
-                                                        fontSize: (element.styles?.font_size || 14) * scale,
-                                                        color: element.styles?.color || '#000',
-                                                        textAlign: element.styles?.align || 'left',
-                                                        border: isSelected
-                                                            ? '2px dashed #6366f1'
-                                                            : '1px dashed transparent',
-                                                        outline: isSelected ? '4px solid rgba(99,102,241,0.08)' : 'none',
-                                                        overflow: 'hidden',
-                                                        zIndex: isSelected ? 20 : 10,
-                                                    }}
+                                                    className="absolute flex cursor-move items-center justify-center"
+                                                    style={style}
                                                 >
                                                     {isSelected && (
                                                         <>
@@ -803,9 +1137,6 @@ export default function Editor({
                                                                 {element.name || element.type}
                                                             </span>
 
-                                                            {/* Resize handles — the only way to change width/     */}
-                                                            {/* height. Each reports which edge(s) it controls to  */}
-                                                            {/* onResize via startResize(event, handle).           */}
                                                             {[
                                                                 { handle: 'nw', cursor: 'nwse-resize', style: { top: -5, left: -5 } },
                                                                 { handle: 'n', cursor: 'ns-resize', style: { top: -5, left: '50%', marginLeft: -5 } },
@@ -815,29 +1146,18 @@ export default function Editor({
                                                                 { handle: 's', cursor: 'ns-resize', style: { bottom: -5, left: '50%', marginLeft: -5 } },
                                                                 { handle: 'sw', cursor: 'nesw-resize', style: { bottom: -5, left: -5 } },
                                                                 { handle: 'w', cursor: 'ew-resize', style: { top: '50%', left: -5, marginTop: -5 } },
-                                                            ].map(({ handle, cursor, style }) => (
+                                                            ].map(({ handle, cursor, style: handleStyle }) => (
                                                                 <span
                                                                     key={handle}
                                                                     onMouseDown={(event) => startResize(event, handle)}
-                                                                    className="absolute h-2.5 w-2.5 rounded-full border-2 border-indigo-600 bg-white shadow-sm hover:scale-125 transition-transform"
-                                                                    style={{ ...style, cursor, zIndex: 30 }}
+                                                                    className="absolute h-2.5 w-2.5 rounded-full border-2 border-indigo-600 bg-white shadow-sm transition-transform hover:scale-125"
+                                                                    style={{ ...handleStyle, cursor, zIndex: 30 }}
                                                                 />
                                                             ))}
                                                         </>
                                                     )}
 
-                                                    {element.type === 'QR_CODE' ? (
-                                                        <span className="inline-flex items-center gap-1 text-current">
-                                                            <QrCodeIcon className="h-[1em] w-[1em]" />
-                                                            QR
-                                                        </span>
-                                                    ) : element.type === 'IMAGE' ? (
-                                                        <span className="inline-flex items-center gap-1 text-current">
-                                                            <ImageIcon className="h-[1em] w-[1em]" />
-                                                        </span>
-                                                    ) : (
-                                                        label(element)
-                                                    )}
+                                                    {renderCanvasContent(element)}
                                                 </div>
                                             );
                                         })}
@@ -974,6 +1294,168 @@ export default function Editor({
                                             </div>
                                         )}
 
+                                        {/* Visual design properties */}
+                                        {selected.type === 'RECTANGLE' && (
+                                            <div>
+                                                <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                                                    Rectangle
+                                                </p>
+                                                <div className="space-y-3">
+                                                    <div>
+                                                        <span className="text-xs text-slate-500">Fill</span>
+                                                        <div className="mt-1 flex items-center gap-2">
+                                                            <input
+                                                                type="color"
+                                                                value={selected.config?.fill === 'transparent' ? '#FFFFFF' : selected.config?.fill || '#FFFFFF'}
+                                                                onChange={(event) => updateSelectedConfig({ fill: event.target.value })}
+                                                                className="h-9 w-9 rounded-lg border border-slate-300 p-0.5"
+                                                            />
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => updateSelectedConfig({ fill: 'transparent' })}
+                                                                className="rounded-lg border border-slate-200 px-2 py-1.5 text-[11px] font-semibold text-slate-600 hover:bg-slate-50"
+                                                            >
+                                                                Transparent
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                    <div>
+                                                        <span className="text-xs text-slate-500">Border Color</span>
+                                                        <input
+                                                            type="color"
+                                                            value={selected.config?.border_color || '#D4AF37'}
+                                                            onChange={(event) => updateSelectedConfig({ border_color: event.target.value })}
+                                                            className="mt-1 h-9 w-full rounded border border-slate-300"
+                                                        />
+                                                    </div>
+                                                    <div className="grid grid-cols-2 gap-2">
+                                                        <label className="block">
+                                                            <span className="text-xs text-slate-500">Border Width</span>
+                                                            <input
+                                                                type="number"
+                                                                min="0"
+                                                                max="20"
+                                                                className="mt-1 w-full rounded-lg border-slate-300 text-sm"
+                                                                value={selected.config?.border_width ?? 3}
+                                                                onChange={(event) => updateSelectedConfig({ border_width: clamp(Number(event.target.value), 0, 20) })}
+                                                            />
+                                                        </label>
+                                                        <label className="block">
+                                                            <span className="text-xs text-slate-500">Radius</span>
+                                                            <input
+                                                                type="number"
+                                                                min="0"
+                                                                max="100"
+                                                                className="mt-1 w-full rounded-lg border-slate-300 text-sm"
+                                                                value={selected.config?.radius ?? 8}
+                                                                onChange={(event) => updateSelectedConfig({ radius: clamp(Number(event.target.value), 0, 100) })}
+                                                            />
+                                                        </label>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {selected.type === 'LINE' && (
+                                            <div>
+                                                <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                                                    Line
+                                                </p>
+                                                <div className="space-y-3">
+                                                    <label className="block">
+                                                        <span className="text-xs text-slate-500">Orientation</span>
+                                                        <select
+                                                            className="mt-1 w-full rounded-lg border-slate-300 text-sm"
+                                                            value={selected.config?.orientation || 'horizontal'}
+                                                            onChange={(event) => updateSelectedConfig({ orientation: event.target.value })}
+                                                        >
+                                                            <option value="horizontal">Horizontal</option>
+                                                            <option value="vertical">Vertical</option>
+                                                        </select>
+                                                    </label>
+                                                    <div>
+                                                        <span className="text-xs text-slate-500">Color</span>
+                                                        <input
+                                                            type="color"
+                                                            value={selected.config?.color || '#D4AF37'}
+                                                            onChange={(event) => updateSelectedConfig({ color: event.target.value })}
+                                                            className="mt-1 h-9 w-full rounded border border-slate-300"
+                                                        />
+                                                    </div>
+                                                    <label className="block">
+                                                        <span className="text-xs text-slate-500">Thickness</span>
+                                                        <input
+                                                            type="number"
+                                                            min="1"
+                                                            max="20"
+                                                            className="mt-1 w-full rounded-lg border-slate-300 text-sm"
+                                                            value={selected.config?.thickness ?? 3}
+                                                            onChange={(event) => updateSelectedConfig({ thickness: clamp(Number(event.target.value), 1, 20) })}
+                                                        />
+                                                    </label>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {selected.type === 'BACKGROUND' && (
+                                            <div>
+                                                <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                                                    Background
+                                                </p>
+                                                <input
+                                                    type="color"
+                                                    value={selected.config?.color || '#FFFFFF'}
+                                                    onChange={(event) => updateSelectedConfig({ color: event.target.value })}
+                                                    className="mt-1 h-10 w-full rounded border border-slate-300"
+                                                />
+                                                <p className="mt-1 text-[11px] leading-relaxed text-slate-400">
+                                                    Background remains behind the certificate content.
+                                                </p>
+                                            </div>
+                                        )}
+
+                                        {selected.type === 'DECORATION' && (
+                                            <div>
+                                                <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                                                    Decoration
+                                                </p>
+                                                <div className="space-y-3">
+                                                    <label className="block">
+                                                        <span className="text-xs text-slate-500">Variant</span>
+                                                        <select
+                                                            className="mt-1 w-full rounded-lg border-slate-300 text-sm"
+                                                            value={selected.config?.variant || 'corner'}
+                                                            onChange={(event) => updateSelectedConfig({ variant: event.target.value })}
+                                                        >
+                                                            <option value="corner">Corner</option>
+                                                            <option value="double_corner">Double Corner</option>
+                                                            <option value="seal">Seal</option>
+                                                            <option value="divider">Divider</option>
+                                                            <option value="ornament">Ornament</option>
+                                                        </select>
+                                                    </label>
+                                                    <div>
+                                                        <span className="text-xs text-slate-500">Primary Color</span>
+                                                        <input
+                                                            type="color"
+                                                            value={selected.config?.color || '#D4AF37'}
+                                                            onChange={(event) => updateSelectedConfig({ color: event.target.value })}
+                                                            className="mt-1 h-9 w-full rounded border border-slate-300"
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <span className="text-xs text-slate-500">Secondary Color</span>
+                                                        <input
+                                                            type="color"
+                                                            value={selected.config?.secondary_color || '#B8860B'}
+                                                            onChange={(event) => updateSelectedConfig({ secondary_color: event.target.value })}
+                                                            className="mt-1 h-9 w-full rounded border border-slate-300"
+                                                        />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+
                                         {/* Position & size — X/Y stay as precise numeric fields;      */}
                                         {/* width/height are mouse-only now, so they're shown as a      */}
                                         {/* live read-out (updated by dragging the canvas handles),     */}
@@ -1038,6 +1520,7 @@ export default function Editor({
                                         </div>
 
                                         {/* Typography */}
+                                        {contentTypes.includes(selected.type) && (
                                         <div>
                                             <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">
                                                 Typography
@@ -1131,6 +1614,7 @@ export default function Editor({
                                                 </div>
                                             </div>
                                         </div>
+                                        )}
                                     </div>
                                 )}
                             </div>

@@ -16,6 +16,12 @@ class AiTemplateValidationService
         'CERTIFICATE_NUMBER',
         'VERIFICATION_URL',
         'QR_CODE',
+
+        // Visual design primitives.
+        'RECTANGLE',
+        'LINE',
+        'BACKGROUND',
+        'DECORATION',
     ];
 
     /**
@@ -45,7 +51,9 @@ class AiTemplateValidationService
     public function validate(array $template): array
     {
         $name = trim((string) ($template['name'] ?? ''));
-        $description = trim((string) ($template['description'] ?? ''));
+        $description = trim(
+            (string) ($template['description'] ?? '')
+        );
 
         if ($name === '') {
             throw new InvalidArgumentException(
@@ -107,9 +115,9 @@ class AiTemplateValidationService
             );
         }
 
-        if (count($elements) < 5 || count($elements) > 12) {
+        if (count($elements) < 5 || count($elements) > 16) {
             throw new InvalidArgumentException(
-                'AI template must contain between 5 and 12 elements.'
+                'AI template must contain between 5 and 16 elements.'
             );
         }
 
@@ -131,16 +139,23 @@ class AiTemplateValidationService
                 $canvasHeight
             );
 
-            if ($normalizedElement['type'] === 'CERTIFICATE_NUMBER') {
+            if (
+                $normalizedElement['type'] ===
+                'CERTIFICATE_NUMBER'
+            ) {
                 $hasCertificateNumber = true;
             }
 
-            if ($normalizedElement['type'] === 'QR_CODE') {
+            if (
+                $normalizedElement['type'] ===
+                'QR_CODE'
+            ) {
                 $hasQrCode = true;
             }
 
             if (
-                $normalizedElement['sort_order'] !== $index
+                $normalizedElement['sort_order'] !==
+                $index
             ) {
                 throw new InvalidArgumentException(
                     "Element {$index} has invalid sort_order."
@@ -181,15 +196,23 @@ class AiTemplateValidationService
         int $canvasWidth,
         int $canvasHeight
     ): array {
-        $type = strtoupper(trim((string) ($element['type'] ?? '')));
+        $type = strtoupper(
+            trim((string) ($element['type'] ?? ''))
+        );
 
-        if (! in_array($type, self::ALLOWED_TYPES, true)) {
+        if (! in_array(
+            $type,
+            self::ALLOWED_TYPES,
+            true
+        )) {
             throw new InvalidArgumentException(
                 "Element {$index} has an unsupported type."
             );
         }
 
-        $name = trim((string) ($element['name'] ?? ''));
+        $name = trim(
+            (string) ($element['name'] ?? '')
+        );
 
         if ($name === '') {
             throw new InvalidArgumentException(
@@ -239,6 +262,21 @@ class AiTemplateValidationService
             "Element {$index} size.height"
         );
 
+        /*
+ * Decorations are visual accents, not large layout containers.
+ */
+        if ($type === 'DECORATION') {
+            $width = min(
+                $width,
+                min(260, $canvasWidth)
+            );
+
+            $height = min(
+                $height,
+                min(180, $canvasHeight)
+            );
+        }
+
         if ($x + $width > $canvasWidth) {
             throw new InvalidArgumentException(
                 "Element {$index} exceeds the canvas width."
@@ -253,8 +291,20 @@ class AiTemplateValidationService
 
         $dataKey = $element['data_key'] ?? null;
 
-        if ($dataKey !== null) {
+        if ($type === 'DYNAMIC_FIELD') {
+            if ($dataKey === null) {
+                throw new InvalidArgumentException(
+                    "DYNAMIC_FIELD {$index} requires data_key."
+                );
+            }
+
             $dataKey = trim((string) $dataKey);
+
+            if ($dataKey === '') {
+                throw new InvalidArgumentException(
+                    "DYNAMIC_FIELD {$index} requires data_key."
+                );
+            }
 
             if (! in_array(
                 $dataKey,
@@ -262,9 +312,15 @@ class AiTemplateValidationService
                 true
             )) {
                 throw new InvalidArgumentException(
-                    "Element {$index} has an unsupported data_key."
+                    "DYNAMIC_FIELD {$index} has an unsupported data_key."
                 );
             }
+        } else {
+            /*
+     * Only DYNAMIC_FIELD is allowed to carry a data_key.
+     * Ignore accidental AI-provided values for other element types.
+     */
+            $dataKey = null;
         }
 
         $config = $element['config'] ?? [];
@@ -291,16 +347,6 @@ class AiTemplateValidationService
             );
         }
 
-        $styles = $this->normalizeStyles($styles, $index);
-
-        if ($styles !== null && ! is_array($styles)) {
-            throw new InvalidArgumentException(
-                "Element {$index} styles must be an object."
-            );
-        }
-
-        $styles = $styles ?? [];
-
         $styles = $this->normalizeStyles(
             $styles,
             $index
@@ -312,7 +358,9 @@ class AiTemplateValidationService
         );
 
         /*
-         * Type-specific rules.
+         * ---------------------------------------------------------------
+         * Type-specific rules
+         * ---------------------------------------------------------------
          */
 
         if ($type === 'TEXT') {
@@ -344,7 +392,10 @@ class AiTemplateValidationService
         }
 
         if ($type === 'DYNAMIC_FIELD') {
-            if ($dataKey === null || $dataKey === '') {
+            if (
+                $dataKey === null ||
+                $dataKey === ''
+            ) {
                 throw new InvalidArgumentException(
                     "DYNAMIC_FIELD {$index} requires data_key."
                 );
@@ -364,7 +415,10 @@ class AiTemplateValidationService
                 "QR_CODE {$index} config.size"
             );
 
-            if ($qrSize < 20 || $qrSize > 500) {
+            if (
+                $qrSize < 20 ||
+                $qrSize > 500
+            ) {
                 throw new InvalidArgumentException(
                     "QR_CODE {$index} size must be between 20 and 500."
                 );
@@ -375,14 +429,75 @@ class AiTemplateValidationService
             ];
         }
 
+        /*
+         * ---------------------------------------------------------------
+         * Visual design primitives
+         * ---------------------------------------------------------------
+         */
+
+        if ($type === 'RECTANGLE') {
+            $config = $this->normalizeRectangleConfig(
+                $config,
+                $index
+            );
+        }
+
+        if ($type === 'LINE') {
+            $config = $this->normalizeLineConfig(
+                $config,
+                $index
+            );
+        }
+
+        if ($type === 'BACKGROUND') {
+            $config = $this->normalizeBackgroundConfig(
+                $config,
+                $index
+            );
+        }
+
+        if ($type === 'DECORATION') {
+            $config = $this->normalizeDecorationConfig(
+                $config,
+                $index
+            );
+        }
+
+        if ($type === 'DECORATION') {
+            /*
+     * Decorations should remain decorative rather than becoming
+     * giant canvas-sized containers.
+     */
+            $maxDecorationWidth = min(
+                260,
+                $canvasWidth
+            );
+
+            $maxDecorationHeight = min(
+                180,
+                $canvasHeight
+            );
+
+            $width = min(
+                $width,
+                $maxDecorationWidth
+            );
+
+            $height = min(
+                $height,
+                $maxDecorationHeight
+            );
+        }
+
+        /*
+         * IMAGE and system-generated types must not receive arbitrary
+         * AI-controlled paths or executable content.
+         */
         if (
             $type === 'CERTIFICATE_NUMBER' ||
             $type === 'VERIFICATION_URL' ||
             $type === 'IMAGE'
         ) {
-            /*
-             * Keep only safe configuration values we explicitly support.
-             */
             $config = $this->normalizeSafeConfig(
                 $config,
                 $type,
@@ -395,14 +510,17 @@ class AiTemplateValidationService
             'name' => $name,
             'data_key' => $dataKey,
             'config' => $config,
+
             'position' => [
                 'x' => $x,
                 'y' => $y,
             ],
+
             'size' => [
                 'width' => $width,
                 'height' => $height,
             ],
+
             'styles' => $styles,
             'sort_order' => $sortOrder,
         ];
@@ -410,6 +528,8 @@ class AiTemplateValidationService
 
     /**
      * Normalize supported style properties.
+     *
+     * Only explicit, safe visual properties are retained.
      */
     private function normalizeStyles(
         array $styles,
@@ -417,13 +537,19 @@ class AiTemplateValidationService
     ): array {
         $normalized = [];
 
-        if (array_key_exists('font_size', $styles)) {
+        if (array_key_exists(
+            'font_size',
+            $styles
+        )) {
             $fontSize = $this->positiveInt(
                 $styles['font_size'],
                 "Element {$index} styles.font_size"
             );
 
-            if ($fontSize < 6 || $fontSize > 120) {
+            if (
+                $fontSize < 6 ||
+                $fontSize > 120
+            ) {
                 throw new InvalidArgumentException(
                     "Element {$index} font size must be between 6 and 120."
                 );
@@ -432,12 +558,21 @@ class AiTemplateValidationService
             $normalized['font_size'] = $fontSize;
         }
 
-        if (array_key_exists('align', $styles)) {
-            $align = trim((string) $styles['align']);
+        if (array_key_exists(
+            'align',
+            $styles
+        )) {
+            $align = trim(
+                (string) $styles['align']
+            );
 
             if (! in_array(
                 $align,
-                ['left', 'center', 'right'],
+                [
+                    'left',
+                    'center',
+                    'right',
+                ],
                 true
             )) {
                 throw new InvalidArgumentException(
@@ -448,28 +583,263 @@ class AiTemplateValidationService
             $normalized['align'] = $align;
         }
 
-        if (array_key_exists('color', $styles)) {
-            $color = strtoupper(
-                trim((string) $styles['color'])
+        if (array_key_exists(
+            'color',
+            $styles
+        )) {
+            $normalized['color'] = $this->hexColor(
+                $styles['color'],
+                "Element {$index} styles.color"
             );
+        }
 
-            if (! preg_match(
-                '/^#[0-9A-F]{6}$/i',
-                $color
-            )) {
+        /*
+         * Optional visual weight for text/design elements.
+         */
+        if (array_key_exists('opacity', $styles)) {
+            $opacity = $styles['opacity'];
+
+            if (! is_numeric($opacity)) {
                 throw new InvalidArgumentException(
-                    "Element {$index} has invalid color."
+                    "Element {$index} opacity must be numeric."
                 );
             }
 
-            $normalized['color'] = $color;
+            $opacity = (float) $opacity;
+
+            /*
+     * AI models sometimes return opacity as a percentage
+     * (for example 80 or 50) instead of 0-1.
+     *
+     * Normalize percentage-style values automatically.
+     */
+            if ($opacity > 1 && $opacity <= 100) {
+                $opacity /= 100;
+            }
+
+            if ($opacity < 0 || $opacity > 1) {
+                throw new InvalidArgumentException(
+                    "Element {$index} opacity must be between 0 and 1."
+                );
+            }
+
+            $normalized['opacity'] = round(
+                $opacity,
+                3
+            );
         }
 
         return $normalized;
     }
 
     /**
-     * Keep only explicitly allowed config values.
+     * Normalize rectangle configuration.
+     */
+    private function normalizeRectangleConfig(
+        array $config,
+        int $index
+    ): array {
+        $fill = $config['fill'] ?? 'transparent';
+
+        if (
+            ! is_string($fill) &&
+            $fill !== null
+        ) {
+            throw new InvalidArgumentException(
+                "RECTANGLE {$index} fill must be a color or transparent."
+            );
+        }
+
+        if (
+            $fill !== null &&
+            strtolower(trim($fill)) !== 'transparent'
+        ) {
+            $fill = $this->hexColor(
+                $fill,
+                "RECTANGLE {$index} config.fill"
+            );
+        } else {
+            $fill = 'transparent';
+        }
+
+        $borderColor = $config['border_color']
+            ?? '#000000';
+
+        $borderColor = $this->hexColor(
+            $borderColor,
+            "RECTANGLE {$index} config.border_color"
+        );
+
+        $borderWidth = $this->nonNegativeInt(
+            $config['border_width'] ?? 0,
+            "RECTANGLE {$index} config.border_width"
+        );
+
+        /*
+ * A transparent rectangle with no border is visually invisible.
+ * For AI-generated certificate frames, use a safe visible default.
+ */
+        if (
+            $fill === 'transparent' &&
+            $borderWidth === 0
+        ) {
+            $borderWidth = 3;
+        }
+
+        if ($borderWidth > 20) {
+            throw new InvalidArgumentException(
+                "RECTANGLE {$index} border width cannot exceed 20."
+            );
+        }
+
+        $radius = $this->nonNegativeInt(
+            $config['radius'] ?? 0,
+            "RECTANGLE {$index} config.radius"
+        );
+
+        if ($radius > 100) {
+            throw new InvalidArgumentException(
+                "RECTANGLE {$index} radius cannot exceed 100."
+            );
+        }
+
+        return [
+            'fill' => $fill,
+            'border_color' => $borderColor,
+            'border_width' => $borderWidth,
+            'radius' => $radius,
+        ];
+    }
+
+    /**
+     * Normalize line configuration.
+     */
+    private function normalizeLineConfig(
+        array $config,
+        int $index
+    ): array {
+        $orientation =
+            strtolower(
+                trim(
+                    (string) (
+                        $config['orientation']
+                        ?? 'horizontal'
+                    )
+                )
+            );
+
+        if (! in_array(
+            $orientation,
+            [
+                'horizontal',
+                'vertical',
+            ],
+            true
+        )) {
+            throw new InvalidArgumentException(
+                "LINE {$index} orientation must be horizontal or vertical."
+            );
+        }
+
+        $color = $this->hexColor(
+            $config['color'] ?? '#000000',
+            "LINE {$index} config.color"
+        );
+
+        $thickness = $this->positiveInt(
+            $config['thickness'] ?? 2,
+            "LINE {$index} config.thickness"
+        );
+
+        if ($thickness > 20) {
+            throw new InvalidArgumentException(
+                "LINE {$index} thickness cannot exceed 20."
+            );
+        }
+
+        return [
+            'orientation' => $orientation,
+            'color' => $color,
+            'thickness' => $thickness,
+        ];
+    }
+
+    /**
+     * Normalize background configuration.
+     */
+    private function normalizeBackgroundConfig(
+        array $config,
+        int $index
+    ): array {
+        $color = $this->hexColor(
+            $config['color'] ?? '#FFFFFF',
+            "BACKGROUND {$index} config.color"
+        );
+
+        return [
+            'color' => $color,
+        ];
+    }
+
+    /**
+     * Normalize decoration configuration.
+     */
+    private function normalizeDecorationConfig(
+        array $config,
+        int $index
+    ): array {
+        $variant =
+            strtolower(
+                trim(
+                    (string) (
+                        $config['variant']
+                        ?? 'corner'
+                    )
+                )
+            );
+
+        $allowedVariants = [
+            'corner',
+            'double_corner',
+            'seal',
+            'divider',
+            'ornament',
+        ];
+
+        if (! in_array(
+            $variant,
+            $allowedVariants,
+            true
+        )) {
+            throw new InvalidArgumentException(
+                "DECORATION {$index} has an unsupported variant."
+            );
+        }
+
+        $color = $this->hexColor(
+            $config['color'] ?? '#D4AF37',
+            "DECORATION {$index} config.color"
+        );
+
+        $secondaryColor = $config['secondary_color']
+            ?? null;
+
+        if ($secondaryColor !== null) {
+            $secondaryColor = $this->hexColor(
+                $secondaryColor,
+                "DECORATION {$index} config.secondary_color"
+            );
+        }
+
+        return [
+            'variant' => $variant,
+            'color' => $color,
+            'secondary_color' => $secondaryColor,
+        ];
+    }
+
+    /**
+     * Keep only explicitly allowed config values for non-design types.
      */
     private function normalizeSafeConfig(
         array $config,
@@ -484,6 +854,35 @@ class AiTemplateValidationService
         }
 
         return [];
+    }
+
+    /**
+     * Validate a hexadecimal color.
+     */
+    private function hexColor(
+        mixed $value,
+        string $field
+    ): string {
+        if (! is_string($value)) {
+            throw new InvalidArgumentException(
+                "{$field} must be a hexadecimal color."
+            );
+        }
+
+        $color = strtoupper(
+            trim($value)
+        );
+
+        if (! preg_match(
+            '/^#[0-9A-F]{6}$/',
+            $color
+        )) {
+            throw new InvalidArgumentException(
+                "{$field} must be a valid #RRGGBB color."
+            );
+        }
+
+        return $color;
     }
 
     private function positiveInt(
@@ -542,6 +941,9 @@ class AiTemplateValidationService
         mixed $value,
         string $field
     ): int {
-        return $this->positiveOrZeroInt($value, $field);
+        return $this->positiveOrZeroInt(
+            $value,
+            $field
+        );
     }
 }

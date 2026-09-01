@@ -16,6 +16,7 @@ use App\Services\PricingService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use App\Services\ZipService;
+use App\Services\OrganizationAccessService;
 
 class BatchController extends Controller
 {
@@ -26,6 +27,7 @@ class BatchController extends Controller
         private PaymentService $payment,
         private CertificateService $certificates,
         private ZipService $zip,
+        private OrganizationAccessService $organizationAccess,
     ) {}
 
     private function owned(Request $request, CertificateBatch $batch): CertificateBatch
@@ -67,7 +69,16 @@ class BatchController extends Controller
     public function store(StoreBatchRequest $request)
     {
         $org = $request->user()->currentOrganization();
-        $template = DocumentTemplate::findOrFail($request->validated()['template_id']);
+
+        if (! $org) {
+            return redirect()->route('organization.create');
+        }
+
+        $this->organizationAccess->assertActive($org);
+
+        $template = DocumentTemplate::findOrFail(
+            $request->validated()['template_id']
+        );
         abort_unless($template->organization_id === $org->id, 403);
 
         $contents = file_get_contents($request->file('csv')->getRealPath());
@@ -150,6 +161,11 @@ class BatchController extends Controller
     {
         $this->owned($request, $batch);
 
+        $this->organizationAccess->assertActive(
+            $request->user()->currentOrganization()
+                ?? abort(403, 'Organization not found.')
+        );
+
         $headers = $batch->original_headers ?? [];
         $rules = [];
         foreach ($headers as $h) {
@@ -170,7 +186,16 @@ class BatchController extends Controller
     {
         $this->owned($request, $batch);
 
-        $this->mapping->saveMapping($batch, $request->validated()['mapping'], $request->user()->id);
+        $this->organizationAccess->assertActive(
+            $request->user()->currentOrganization()
+                ?? abort(403, 'Organization not found.')
+        );
+
+        $this->mapping->saveMapping(
+            $batch,
+            $request->validated()['mapping'],
+            $request->user()->id
+        );
 
         // Assert coverage of template dynamic fields.
         $required = $batch->template->elements()
@@ -187,6 +212,12 @@ class BatchController extends Controller
     public function quote(Request $request, CertificateBatch $batch)
     {
         $this->owned($request, $batch);
+
+        $this->organizationAccess->assertActive(
+            $request->user()->currentOrganization()
+                ?? abort(403, 'Organization not found.')
+        );
+
         $this->pricing->buildQuote($batch);
 
         return redirect()->route('organization.batches.show', $batch)->with('success', 'Quote generated.');
@@ -196,7 +227,13 @@ class BatchController extends Controller
     {
         $this->owned($request, $batch);
 
-        $quote = $batch->quote ?? abort(422, 'Generate a quote first.');
+        $this->organizationAccess->assertActive(
+            $request->user()->currentOrganization()
+                ?? abort(403, 'Organization not found.')
+        );
+
+        $quote = $batch->quote
+            ?? abort(422, 'Generate a quote first.');
 
         if (config('payments.provider') === 'razorpay') {
             $payment = $this->payment->createOrderForQuote($quote);
@@ -228,6 +265,11 @@ class BatchController extends Controller
     {
         $this->owned($request, $batch);
 
+        $this->organizationAccess->assertActive(
+            $request->user()->currentOrganization()
+                ?? abort(403, 'Organization not found.')
+        );
+
         if (config('queue.default') === 'sync') {
             $this->certificates->generateBatchCertificates($batch);
         } else {
@@ -240,6 +282,11 @@ class BatchController extends Controller
     public function anchor(Request $request, CertificateBatch $batch)
     {
         $this->owned($request, $batch);
+
+        $this->organizationAccess->assertActive(
+            $request->user()->currentOrganization()
+                ?? abort(403, 'Organization not found.')
+        );
 
         if (config('queue.default') === 'sync') {
             $anchor = $this->certificates->anchorBatch($batch);

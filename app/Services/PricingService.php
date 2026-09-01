@@ -8,6 +8,7 @@ use App\Enums\QuoteStatus;
 use App\Models\CertificateBatch;
 use App\Models\PricingQuote;
 use RuntimeException;
+use App\Services\OrganizationAccessService;
 
 /**
  * Clean, centralized pricing/quote engine. Pricing logic never lives in
@@ -17,10 +18,15 @@ class PricingService
 {
     public function __construct(
         private ActivityLogService $activityLog,
+        private OrganizationAccessService $organizationAccess,
     ) {}
 
     public function buildQuote(CertificateBatch $batch): PricingQuote
     {
+
+        $this->organizationAccess->assertActive(
+            $batch->organization
+        );
         if (! in_array($batch->status->value, [BatchStatus::Validated->value, BatchStatus::Mapped->value], true)) {
             throw new RuntimeException('Batch must be validated before generating a quote.');
         }
