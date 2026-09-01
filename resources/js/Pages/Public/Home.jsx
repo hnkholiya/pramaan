@@ -249,10 +249,10 @@ function NetworkNode({ icon: Icon, label, detail, align = 'left', delay = 0 }) {
                     <Icon className="h-4 w-4 text-blue-600" />
                 </div>
                 <div>
-                    <p className="text-[9px] font-bold tracking-[0.12em] text-slate-700">
+                    <p className="text-[11px] font-bold tracking-[0.1em] text-slate-700">
                         {label}
                     </p>
-                    <p className="mt-1 text-[9px] leading-tight text-slate-400">
+                    <p className="mt-1 text-[11px] leading-tight text-slate-400">
                         {detail}
                     </p>
                 </div>
@@ -321,7 +321,7 @@ function TrustNetwork() {
                             <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75 motion-reduce:animate-none" />
                             <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500" />
                         </span>
-                        <span className="text-[9px] font-bold uppercase tracking-[0.14em] text-emerald-700">
+                        <span className="text-[11px] font-bold uppercase tracking-[0.12em] text-emerald-700">
                             Proof verified
                         </span>
                     </div>
@@ -331,7 +331,7 @@ function TrustNetwork() {
             {/* Label – bottom */}
             <Reveal direction="up" delay={700} duration={700} distance={12}>
                 <div className="absolute bottom-[2%] left-1/2 -translate-x-1/2">
-                    <div className="whitespace-nowrap rounded-full border border-slate-200/80 bg-white/95 px-3 py-1.5 text-[8px] font-bold uppercase tracking-[0.16em] text-slate-400 shadow-sm backdrop-blur-sm">
+                    <div className="whitespace-nowrap rounded-full border border-slate-200/80 bg-white/95 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400 shadow-sm backdrop-blur-sm">
                         Pramaan trust network
                     </div>
                 </div>
@@ -367,13 +367,13 @@ function ArchitectureRow({ icon: Icon, title, value, accent = false, success = f
                         <Icon className="h-4 w-4" />
                     </div>
                     <div className="min-w-0">
-                        <p className="truncate text-[10px] font-semibold tracking-tight text-slate-700">
+                        <p className="truncate text-[12px] font-semibold tracking-tight text-slate-700">
                             {title}
                         </p>
                     </div>
                 </div>
 
-                <span className={`shrink-0 font-mono text-[9px] font-semibold ${valueStyle}`}>
+                <span className={`shrink-0 font-mono text-[11px] font-semibold ${valueStyle}`}>
                     {value}
                 </span>
             </div>
@@ -599,10 +599,10 @@ export default function Home() {
                 {/*  panel once the user has scrolled past it.                   */}
                 {/* ============================================================ */}
                 <header
-                    className={`fixed left-0 right-0 top-0 z-50 border-b transition-all duration-500 ease-out ${
+                    className={`sticky top-0 z-50 border-b transition-all duration-300 ease-out ${
                         scrolled
-                            ? 'border-slate-200/70 bg-white/60 shadow-[0_8px_32px_rgba(15,23,42,0.08)] backdrop-blur-2xl backdrop-saturate-150'
-                            : 'border-slate-200/80 bg-white/90 shadow-none backdrop-blur-xl'
+                            ? 'border-slate-200 bg-white/95 shadow-[0_4px_20px_rgba(15,23,42,0.08)] backdrop-blur-xl backdrop-saturate-150'
+                            : 'border-slate-200/70 bg-white/80 shadow-none backdrop-blur-xl'
                     }`}
                 >
                     <div className="mx-auto flex h-[76px] max-w-7xl items-center justify-between px-5 sm:px-8 lg:px-10">
@@ -617,7 +617,7 @@ export default function Home() {
                                 <div className="text-[19px] font-bold tracking-[-0.035em] text-slate-950">
                                     Pramaan
                                 </div>
-                                <div className="mt-1 text-[8px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                                <div className="mt-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
                                     Digital trust infrastructure
                                 </div>
                             </div>
@@ -717,7 +717,7 @@ export default function Home() {
                     {/* ======================================================== */}
                     {/*  HERO                                                    */}
                     {/* ======================================================== */}
-                    <section className="relative min-h-screen overflow-hidden bg-[#f8fafc] pt-[76px]">
+                    <section className="relative min-h-screen overflow-hidden bg-[#f8fafc]">
                         {/* Background grid + glow */}
                         <div className="pointer-events-none absolute inset-0">
                             <div
@@ -749,7 +749,7 @@ export default function Home() {
                                 >
                                     <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 shadow-sm transition-transform duration-500 hover:scale-[1.03]">
                                         <span className="h-1.5 w-1.5 rounded-full bg-blue-600 animate-pulse" />
-                                        <span className="text-[9px] font-bold uppercase tracking-[0.16em] text-slate-500">
+                                        <span className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500">
                                             Verifiable digital certificate infrastructure
                                         </span>
                                     </div>
@@ -789,19 +789,19 @@ export default function Home() {
                                             <span className="flex h-6 w-6 items-center justify-center rounded-md bg-white text-slate-600 shadow-sm ring-1 ring-slate-200 transition-colors duration-300 hover:text-blue-600">
                                                 <Fingerprint className="h-3.5 w-3.5" />
                                             </span>
-                                            <span className="text-[10px] font-semibold text-slate-500">SHA-256</span>
+                                            <span className="text-[12px] font-semibold text-slate-500">SHA-256</span>
                                         </div>
                                         <div className="flex items-center gap-2 transition-transform duration-300 hover:-translate-y-0.5">
                                             <span className="flex h-6 w-6 items-center justify-center rounded-md bg-white text-slate-600 shadow-sm ring-1 ring-slate-200 transition-colors duration-300 hover:text-blue-600">
                                                 <Blocks className="h-3.5 w-3.5" />
                                             </span>
-                                            <span className="text-[10px] font-semibold text-slate-500">Blockchain backed</span>
+                                            <span className="text-[12px] font-semibold text-slate-500">Blockchain backed</span>
                                         </div>
                                         <div className="flex items-center gap-2 transition-transform duration-300 hover:-translate-y-0.5">
                                             <span className="flex h-6 w-6 items-center justify-center rounded-md bg-white text-slate-600 shadow-sm ring-1 ring-slate-200 transition-colors duration-300 hover:text-blue-600">
                                                 <QrCode className="h-3.5 w-3.5" />
                                             </span>
-                                            <span className="text-[10px] font-semibold text-slate-500">QR verification</span>
+                                            <span className="text-[12px] font-semibold text-slate-500">QR verification</span>
                                         </div>
                                     </div>
                                 </div>
@@ -822,10 +822,10 @@ export default function Home() {
                         {/* Bottom strip */}
                         <div className="relative border-t border-slate-200 bg-white/70">
                             <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-5 py-5 sm:px-8 lg:px-10">
-                                <span className="text-[9px] font-bold uppercase tracking-[0.18em] text-slate-400">
+                                <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-400">
                                     The infrastructure behind verifiable certificates
                                 </span>
-                                <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-[9px] font-semibold text-slate-400">
+                                <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-[11px] font-semibold text-slate-400">
                                     <span className="transition-colors duration-300 hover:text-blue-600">Issue</span>
                                     <span className="text-slate-200">/</span>
                                     <span className="transition-colors duration-300 hover:text-blue-600">Fingerprint</span>
@@ -846,7 +846,7 @@ export default function Home() {
                             <Reveal>
                                 <div className="grid gap-10 lg:grid-cols-[0.82fr_1.18fr] lg:items-end">
                                     <div>
-                                        <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-blue-600">
+                                        <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-blue-600">
                                             Why Pramaan
                                         </p>
                                         <h2 className="mt-4 text-3xl font-bold leading-[1.1] tracking-[-0.045em] text-slate-950 sm:text-4xl lg:text-[48px]">
@@ -870,7 +870,7 @@ export default function Home() {
                                                 <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-slate-950 text-white transition-all duration-300 group-hover:bg-blue-600 group-hover:scale-110 group-hover:rotate-3">
                                                     <Icon className="h-5 w-5" />
                                                 </div>
-                                                <span className="font-mono text-[10px] font-bold text-slate-300 transition-colors duration-300 group-hover:text-blue-300">
+                                                <span className="font-mono text-[12px] font-bold text-slate-300 transition-colors duration-300 group-hover:text-blue-300">
                                                     {number}
                                                 </span>
                                             </div>
@@ -899,7 +899,7 @@ export default function Home() {
                             <div className="grid items-center gap-14 lg:grid-cols-[1fr_0.9fr] lg:gap-24">
                                 <Reveal direction="right" distance={40}>
                                     <div>
-                                        <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-blue-600">
+                                        <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-blue-600">
                                             Technology
                                         </p>
                                         <h2 className="mt-4 max-w-xl text-3xl font-bold leading-[1.1] tracking-[-0.045em] text-slate-950 sm:text-4xl lg:text-[48px]">
@@ -920,7 +920,7 @@ export default function Home() {
                                                     <p className="mt-5 text-[12px] font-bold text-slate-950">
                                                         Document fingerprint
                                                     </p>
-                                                    <p className="mt-2 text-[10px] leading-5 text-slate-500">
+                                                    <p className="mt-2 text-[12px] leading-5 text-slate-500">
                                                         A deterministic cryptographic representation of
                                                         the document.
                                                     </p>
@@ -932,7 +932,7 @@ export default function Home() {
                                                     <p className="mt-5 text-[12px] font-bold text-slate-950">
                                                         Blockchain proof
                                                     </p>
-                                                    <p className="mt-2 text-[10px] leading-5 text-slate-500">
+                                                    <p className="mt-2 text-[12px] leading-5 text-slate-500">
                                                         A durable proof record designed for independent
                                                         verification.
                                                     </p>
@@ -948,10 +948,10 @@ export default function Home() {
                                         <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_25px_70px_rgba(15,23,42,0.08)] transition-shadow duration-500 hover:shadow-[0_30px_80px_rgba(15,23,42,0.12)]">
                                             <div className="border-b border-slate-200 px-5 py-4">
                                                 <div className="flex items-center justify-between">
-                                                    <span className="text-[9px] font-bold uppercase tracking-[0.16em] text-slate-400">
+                                                    <span className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400">
                                                         Verification architecture
                                                     </span>
-                                                    <span className="flex items-center gap-1.5 text-[9px] font-semibold text-emerald-600">
+                                                    <span className="flex items-center gap-1.5 text-[11px] font-semibold text-emerald-600">
                                                         <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
                                                         Active
                                                     </span>
@@ -970,8 +970,8 @@ export default function Home() {
 
                                             <div className="border-t border-slate-200 bg-slate-50 px-5 py-4">
                                                 <div className="flex items-center justify-between">
-                                                    <span className="text-[9px] text-slate-400">Proof status</span>
-                                                    <span className="text-[9px] font-bold text-emerald-600">Verified</span>
+                                                    <span className="text-[11px] text-slate-400">Proof status</span>
+                                                    <span className="text-[11px] font-bold text-emerald-600">Verified</span>
                                                 </div>
                                             </div>
                                         </div>
@@ -988,7 +988,7 @@ export default function Home() {
                         <div className="mx-auto max-w-7xl px-5 py-20 sm:px-8 lg:px-10 lg:py-28">
                             <Reveal>
                                 <div className="max-w-2xl">
-                                    <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-blue-600">
+                                    <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-blue-600">
                                         How it works
                                     </p>
                                     <h2 className="mt-4 text-3xl font-bold tracking-[-0.045em] text-slate-950 sm:text-4xl lg:text-[48px]">
@@ -1068,7 +1068,7 @@ export default function Home() {
                                 className="absolute left-[8%] top-[20%] hidden rounded-full border border-emerald-400/20 bg-emerald-400/[0.06] px-3 py-1.5 backdrop-blur-sm sm:block"
                                 style={{ animation: 'ctaFloat 6s ease-in-out infinite' }}
                             >
-                                <span className="flex items-center gap-1.5 whitespace-nowrap text-[8px] font-bold uppercase tracking-[0.14em] text-emerald-300">
+                                <span className="flex items-center gap-1.5 whitespace-nowrap text-[11px] font-bold uppercase tracking-[0.12em] text-emerald-300">
                                     <span className="h-1 w-1 rounded-full bg-emerald-400" />
                                     SHA-256 verified
                                 </span>
@@ -1078,7 +1078,7 @@ export default function Home() {
                                 className="absolute right-[9%] top-[30%] hidden rounded-full border border-blue-400/20 bg-blue-400/[0.06] px-3 py-1.5 backdrop-blur-sm sm:block"
                                 style={{ animation: 'ctaFloat 7s ease-in-out infinite 1s' }}
                             >
-                                <span className="whitespace-nowrap font-mono text-[8px] font-semibold tracking-wide text-blue-300">
+                                <span className="whitespace-nowrap font-mono text-[11px] font-semibold tracking-wide text-blue-300">
                                     0x7f3a…9e2c
                                 </span>
                             </div>
@@ -1087,7 +1087,7 @@ export default function Home() {
                                 className="absolute bottom-[26%] left-[13%] hidden rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 backdrop-blur-sm md:block"
                                 style={{ animation: 'ctaFloat 8s ease-in-out infinite 0.5s' }}
                             >
-                                <span className="whitespace-nowrap text-[8px] font-semibold uppercase tracking-[0.14em] text-slate-400">
+                                <span className="whitespace-nowrap text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">
                                     Block #48291 anchored
                                 </span>
                             </div>
@@ -1096,7 +1096,7 @@ export default function Home() {
                                 className="absolute bottom-[22%] right-[12%] hidden rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 backdrop-blur-sm md:block"
                                 style={{ animation: 'ctaFloat 6.5s ease-in-out infinite 1.5s' }}
                             >
-                                <span className="whitespace-nowrap text-[8px] font-semibold uppercase tracking-[0.14em] text-slate-400">
+                                <span className="whitespace-nowrap text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">
                                     Publicly verifiable
                                 </span>
                             </div>
@@ -1111,7 +1111,7 @@ export default function Home() {
                                     </div>
                                 </div>
 
-                                <p className="mt-6 text-[9px] font-bold uppercase tracking-[0.18em] text-blue-300">
+                                <p className="mt-6 text-[11px] font-bold uppercase tracking-[0.16em] text-blue-300">
                                     Build trust into every certificate
                                 </p>
 
@@ -1147,19 +1147,19 @@ export default function Home() {
                                         <span className="flex h-6 w-6 items-center justify-center rounded-md border border-white/10 bg-white/[0.04] text-blue-300">
                                             <Fingerprint className="h-3.5 w-3.5" />
                                         </span>
-                                        <span className="text-[10px] font-semibold text-slate-400">SHA-256</span>
+                                        <span className="text-[12px] font-semibold text-slate-400">SHA-256</span>
                                     </div>
                                     <div className="flex items-center gap-2 transition-transform duration-300 hover:-translate-y-0.5">
                                         <span className="flex h-6 w-6 items-center justify-center rounded-md border border-white/10 bg-white/[0.04] text-blue-300">
                                             <Blocks className="h-3.5 w-3.5" />
                                         </span>
-                                        <span className="text-[10px] font-semibold text-slate-400">Blockchain backed</span>
+                                        <span className="text-[12px] font-semibold text-slate-400">Blockchain backed</span>
                                     </div>
                                     <div className="flex items-center gap-2 transition-transform duration-300 hover:-translate-y-0.5">
                                         <span className="flex h-6 w-6 items-center justify-center rounded-md border border-white/10 bg-white/[0.04] text-blue-300">
                                             <QrCode className="h-3.5 w-3.5" />
                                         </span>
-                                        <span className="text-[10px] font-semibold text-slate-400">QR verification</span>
+                                        <span className="text-[12px] font-semibold text-slate-400">QR verification</span>
                                     </div>
                                 </div>
                             </div>
@@ -1171,43 +1171,50 @@ export default function Home() {
                 {/*  FOOTER                                                      */}
                 {/* ============================================================ */}
                 <footer className="border-t border-slate-800 bg-slate-950">
-                    <div className="mx-auto flex max-w-7xl flex-col gap-7 px-5 py-9 sm:px-8 md:flex-row md:items-center md:justify-between lg:px-10">
+                    <div className="mx-auto flex max-w-7xl flex-col gap-8 px-5 py-12 sm:px-8 md:flex-row md:items-center md:justify-between lg:px-10 lg:py-14">
                         <Link
                             href="/"
                             aria-label="Pramaan home"
-                            className="flex items-center gap-3 rounded-lg transition-transform duration-300 hover:scale-[1.02] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
+                            className="flex items-center gap-3.5 rounded-lg transition-transform duration-300 hover:scale-[1.02] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
                         >
-                            <LogoMark className="h-9 w-9" />
+                            <LogoMark className="h-11 w-11" />
                             <div className="leading-none">
-                                <div className="text-[17px] font-bold tracking-[-0.03em] text-white">
+                                <div className="text-[19px] font-bold tracking-[-0.03em] text-white">
                                     Pramaan
                                 </div>
-                                <div className="mt-1 text-[7px] font-semibold uppercase tracking-[0.18em] text-slate-600">
+                                <div className="mt-1.5 text-[12px] font-semibold uppercase tracking-[0.14em] text-slate-400">
                                     Digital trust infrastructure
                                 </div>
                             </div>
                         </Link>
 
-                        <div className="flex flex-wrap items-center gap-x-6 gap-y-3 text-[10px] font-medium text-slate-600">
-                            <Link
-                                href="/verify"
-                                className="transition-colors hover:text-slate-300 focus-visible:outline-none focus-visible:text-slate-300"
+                        <div className="flex flex-col gap-5 md:items-end">
+                            <nav
+                                className="flex flex-wrap items-center gap-x-7 gap-y-3 text-[13px] font-medium text-slate-300"
+                                aria-label="Footer navigation"
                             >
-                                Verify
-                            </Link>
-                            <Link
-                                href="/login"
-                                className="transition-colors hover:text-slate-300 focus-visible:outline-none focus-visible:text-slate-300"
-                            >
-                                Sign in
-                            </Link>
-                            <Link
-                                href="/register"
-                                className="transition-colors hover:text-slate-300 focus-visible:outline-none focus-visible:text-slate-300"
-                            >
-                                Register
-                            </Link>
-                            <span>© {new Date().getFullYear()} Pramaan</span>
+                                <Link
+                                    href="/verify"
+                                    className="transition-colors duration-200 hover:text-white focus-visible:outline-none focus-visible:text-white"
+                                >
+                                    Verify
+                                </Link>
+                                <Link
+                                    href="/login"
+                                    className="transition-colors duration-200 hover:text-white focus-visible:outline-none focus-visible:text-white"
+                                >
+                                    Sign in
+                                </Link>
+                                <Link
+                                    href="/register"
+                                    className="transition-colors duration-200 hover:text-white focus-visible:outline-none focus-visible:text-white"
+                                >
+                                    Register
+                                </Link>
+                            </nav>
+                            <span className="text-[11px] font-medium text-slate-500">
+                                © {new Date().getFullYear()} Pramaan
+                            </span>
                         </div>
                     </div>
                 </footer>
