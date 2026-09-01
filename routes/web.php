@@ -182,30 +182,94 @@ Route::post('/webhooks/razorpay', [WebhookController::class, 'razorpay'])->name(
 |--------------------------------------------------------------------------
 */
 
-Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(function () {
-    Route::get('/', [AdminController::class, 'dashboard'])->name('dashboard');
-    Route::get('/organizations', [AdminController::class, 'organizations'])->name('organizations');
-    Route::get('/batches', [AdminController::class, 'batches'])->name('batches');
-    Route::get('/certificates', [AdminController::class, 'certificates'])->name('certificates');
-    Route::get('/payments', [AdminController::class, 'payments'])->name('payments');
-    Route::get('/activity', [AdminController::class, 'activity'])->name('activity');
+Route::middleware(['auth', 'admin'])
+    ->prefix('admin')
+    ->name('admin.')
+    ->group(function () {
 
-    Route::prefix('organizations')
-        ->name('organizations.')
-        ->group(function () {
-            Route::get('/', [
-                AdminController::class,
-                'organizations',
-            ])->name('index');
+        /*
+        |--------------------------------------------------------------------------
+        | Dashboard
+        |--------------------------------------------------------------------------
+        */
 
-            Route::get('/{organization}', [
-                AdminController::class,
-                'show',
-            ])->name('show');
+        Route::get('/dashboard', [
+            AdminController::class,
+            'dashboard',
+        ])->name('dashboard');
 
-            Route::patch('/{organization}/status', [
-                AdminController::class,
-                'updateStatus',
-            ])->name('update-status');
-        });
-});
+
+        /*
+        |--------------------------------------------------------------------------
+        | Organizations
+        |--------------------------------------------------------------------------
+        */
+
+        Route::prefix('organizations')
+            ->name('organizations.')
+            ->group(function () {
+
+                Route::get('/', [
+                    AdminController::class,
+                    'organizations',
+                ])->name('index');
+
+                Route::get('/{organization}', [
+                    AdminController::class,
+                    'show',
+                ])->name('show');
+
+                Route::patch('/{organization}/status', [
+                    AdminController::class,
+                    'updateStatus',
+                ])->name('update-status');
+            });
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Batches
+        |--------------------------------------------------------------------------
+        */
+
+        Route::get('/batches', [
+            AdminController::class,
+            'batches',
+        ])->name('batches');
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Certificates
+        |--------------------------------------------------------------------------
+        */
+
+        Route::get('/certificates', [
+            AdminController::class,
+            'certificates',
+        ])->name('certificates');
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Payments
+        |--------------------------------------------------------------------------
+        */
+
+        Route::get('/payments', [
+            AdminController::class,
+            'payments',
+        ])->name('payments');
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Activity
+        |--------------------------------------------------------------------------
+        */
+
+        Route::get('/activity', [
+            AdminController::class,
+            'activity',
+        ])->name('activity');
+    });
