@@ -111,7 +111,7 @@ export default function AdminDashboard({ stats }) {
                             label="Organizations"
                             value={stats.organizations}
                             description="Registered organizations"
-                            href={route('admin.organizations')}
+                            href={route('admin.organizations.index')}
                             accent="indigo"
                             icon={
                                 <svg
@@ -338,7 +338,7 @@ export default function AdminDashboard({ stats }) {
                     <div className="mt-6 grid gap-4 md:grid-cols-3">
 
                         <Link
-                            href={route('admin.organizations')}
+                            href={route('admin.organizations.index')}
                             className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
                         >
                             <h3 className="font-semibold text-slate-900">

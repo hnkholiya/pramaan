@@ -12,6 +12,7 @@ use App\Models\PricingQuote;
 use App\Models\WebhookEvent;
 use App\Services\ActivityLogService;
 use Illuminate\Support\Facades\DB;
+use App\Services\OrganizationAccessService;
 use RuntimeException;
 use Throwable;
 
@@ -20,6 +21,7 @@ class PaymentService
     public function __construct(
         private ActivityLogService $activityLog,
         private PaymentProviderInterface $provider,
+        private OrganizationAccessService $organizationAccess,
     ) {}
 
     public function provider(): PaymentProviderInterface
@@ -32,6 +34,9 @@ class PaymentService
      */
     public function createOrderForQuote(PricingQuote $quote): Payment
     {
+        $this->organizationAccess->assertActive(
+            $quote->organization
+        );
         if ($quote->status !== QuoteStatus::Pending) {
             throw new RuntimeException('Quote is not pending.');
         }

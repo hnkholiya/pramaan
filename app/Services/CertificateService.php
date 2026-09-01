@@ -15,6 +15,7 @@ use App\Services\Blockchain\BlockchainService;
 use App\Services\Merkle\MerkleTreeService;
 use Illuminate\Support\Facades\DB;
 use App\Jobs\ConfirmAnchorJob;
+use App\Services\OrganizationAccessService;
 use RuntimeException;
 use Throwable;
 
@@ -29,6 +30,7 @@ class CertificateService
         private MerkleTreeService $merkle,
         private BlockchainService $blockchain,
         private ActivityLogService $activityLog,
+        private OrganizationAccessService $organizationAccess,
     ) {}
 
     /**
@@ -95,6 +97,9 @@ class CertificateService
      */
     public function generateBatchCertificates(CertificateBatch $batch): CertificateBatch
     {
+        $this->organizationAccess->assertActive(
+            $batch->organization
+        );
         if ($batch->status !== BatchStatus::Paid) {
             throw new RuntimeException('Batch must be paid before generating certificates.');
         }
@@ -127,6 +132,9 @@ class CertificateService
      */
     public function anchorBatch(CertificateBatch $batch): MerkleAnchor
     {
+        $this->organizationAccess->assertActive(
+            $batch->organization
+        );
         $certificates = $batch
             ->certificates()
             ->whereNotNull('pdf_hash')
