@@ -11,6 +11,21 @@ enum TemplateElementType: string
     case VerificationUrl = 'VERIFICATION_URL';
     case QrCode = 'QR_CODE';
 
+    /*
+    |--------------------------------------------------------------------------
+    | Design Elements
+    |--------------------------------------------------------------------------
+    |
+    | These are optional visual primitives used to create richer certificate
+    | designs. Existing element types remain fully backward compatible.
+    |
+    */
+
+    case Rectangle = 'RECTANGLE';
+    case Line = 'LINE';
+    case Background = 'BACKGROUND';
+    case Decoration = 'DECORATION';
+
     public function label(): string
     {
         return match ($this) {
@@ -20,12 +35,20 @@ enum TemplateElementType: string
             self::CertificateNumber => 'Certificate Number',
             self::VerificationUrl => 'Verification URL',
             self::QrCode => 'QR Code',
+
+            self::Rectangle => 'Rectangle',
+            self::Line => 'Line',
+            self::Background => 'Background',
+            self::Decoration => 'Decoration',
         };
     }
 
     /** @return string[] */
     public static function values(): array
     {
-        return array_map(fn ($case) => $case->value, self::cases());
+        return array_map(
+            fn ($case) => $case->value,
+            self::cases()
+        );
     }
 }

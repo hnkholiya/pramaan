@@ -93,6 +93,7 @@ class TemplateController extends Controller
 
     public function generateWithAi(GenerateAiTemplateRequest $request)
     {
+        set_time_limit(120);
         $organization = $request->user()->currentOrganization();
 
         abort_unless(
@@ -130,7 +131,7 @@ class TemplateController extends Controller
             'template.canvas_width' => ['required', 'integer', 'min:800', 'max:3000'],
             'template.canvas_height' => ['required', 'integer', 'min:500', 'max:2000'],
             'template.orientation' => ['required', 'in:landscape,portrait'],
-            'template.elements' => ['required', 'array', 'min:5', 'max:12'],
+            'template.elements' => ['required', 'array', 'min:5', 'max:16'],
         ]);
 
         /*
@@ -238,23 +239,62 @@ class TemplateController extends Controller
         return redirect()->route('organization.templates.index')->with('success', 'Template deleted.');
     }
 
-    public function storeElement(Request $request, DocumentTemplate $template)
-    {
+    public function storeElement(
+        Request $request,
+        DocumentTemplate $template
+    ) {
         $this->owned($request, $template);
 
         $data = $request->validate([
-            'type' => ['required', 'in:TEXT,DYNAMIC_FIELD,IMAGE,CERTIFICATE_NUMBER,VERIFICATION_URL,QR_CODE'],
-            'name' => ['required', 'string', 'max:255'],
-            'data_key' => ['nullable', 'string', 'max:255'],
-            'position' => ['nullable', 'array'],
-            'size' => ['nullable', 'array'],
-            'styles' => ['nullable', 'array'],
-            'config' => ['nullable', 'array'],
+            'type' => [
+                'required',
+                'string',
+                \Illuminate\Validation\Rule::in(
+                    TemplateElementType::values()
+                ),
+            ],
+
+            'name' => [
+                'required',
+                'string',
+                'max:255',
+            ],
+
+            'data_key' => [
+                'nullable',
+                'string',
+                'max:255',
+            ],
+
+            'position' => [
+                'nullable',
+                'array',
+            ],
+
+            'size' => [
+                'nullable',
+                'array',
+            ],
+
+            'styles' => [
+                'nullable',
+                'array',
+            ],
+
+            'config' => [
+                'nullable',
+                'array',
+            ],
         ]);
 
-        $element = $this->service->addElement($template, $data);
+        $element = $this->service->addElement(
+            $template,
+            $data
+        );
 
-        return back()->with(['element' => $this->elementShape($element)]);
+        return back()->with([
+            'element' => $this->elementShape($element),
+        ]);
     }
 
     public function updateElement(Request $request, DocumentTemplate $template, TemplateElement $element)
